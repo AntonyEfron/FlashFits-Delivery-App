@@ -1,18 +1,27 @@
 import React from 'react';
-import { View, StyleSheet, SafeAreaView } from 'react-native';
+import { View, StyleSheet, ViewStyle } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import OnlineToggle from './OnlineToggle';
 
-const TopBar = ({ isOnline, onToggle, isTransparent = false }) => {
+type TopBarProps = {
+  isOnline: boolean;
+  onToggle: () => void;
+  isTransparent?: boolean;
+};
+
+const TopBar: React.FC<TopBarProps> = ({ isOnline, onToggle, isTransparent = false }) => {
   return (
-    <View style={[
-      styles.topBar,
-      { backgroundColor: isTransparent ? 'transparent' : '#ffffff' }
-    ]}>
+    <View
+      style={[
+        styles.topBar,
+        { backgroundColor: isTransparent ? 'transparent' : '#ffffff' }
+      ]}
+    >
       <SafeAreaView style={styles.topBarContent}>
-        <OnlineToggle 
-          isOnline={isOnline} 
+        <OnlineToggle
+          isOnline={isOnline}
           onToggle={onToggle}
-          style={styles.topBarToggle}
+          style={styles.topBarToggle as ViewStyle}
         />
       </SafeAreaView>
     </View>

@@ -9,14 +9,14 @@ import AccountsScreen from './components/AccountsScreen';
 import BottomNavBar from './components/BottomNavBar';
 
 export default function App() {
-  const [activeTab, setActiveTab] = useState('Home');
+  const [activeTab, setActiveTab] = useState<'Home' | 'Accounts'>('Home');
   const [isOnline, setIsOnline] = useState(false);
 
   const handleToggleOnline = () => {
     setIsOnline(!isOnline);
   };
 
-  const handleTabChange = (tab) => {
+  const handleTabChange = (tab: 'Home' | 'Accounts') => {
     setActiveTab(tab);
   };
 
