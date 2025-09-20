@@ -31,7 +31,7 @@ const AnimatedTabIcon: React.FC<Props> = ({ focused, iconName, label, size, colo
 
   const backgroundColor = bgAnim.interpolate({
     inputRange: [0, 1],
-    outputRange: ['transparent', 'black'],
+    outputRange: ['transparent', '#898989'],
   });
 
   return (
@@ -48,7 +48,7 @@ const AnimatedTabIcon: React.FC<Props> = ({ focused, iconName, label, size, colo
     >
       <Ionicons name={iconName} size={focused ? 28 : 21} color={color} />
       <Text
-        style={{
+        style={{  
           fontSize: focused ? 10 : 8,
           marginTop: 2,
           color: focused ? 'black' : 'black',
