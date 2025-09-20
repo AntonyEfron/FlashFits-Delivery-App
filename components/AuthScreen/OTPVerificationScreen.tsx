@@ -298,7 +298,7 @@ const OTPVerificationScreen: React.FC<OTPVerificationScreenProps> = ({
       
       {/* Animated Background Gradient */}
       <LinearGradient 
-        colors={['#667eea', '#764ba2', '#f093fb']} 
+        colors={['#f1f3faff', '#424242ff', '#2c2b2dff']} 
         style={styles.gradient}
         start={{ x: 0, y: 0 }}
         end={{ x: 1, y: 1 }}

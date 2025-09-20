@@ -12,6 +12,7 @@ import {
   Platform,
   Alert,
   Easing,
+  Image
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 
@@ -169,7 +170,7 @@ const LoginScreen = ({ onSendOTP }: { onSendOTP: (phone: string) => void }) => {
       
       {/* Animated Background Gradient */}
       <LinearGradient 
-        colors={['#667eea', '#764ba2', '#f093fb']} 
+        colors={['#f1f3faff', '#424242ff', '#2c2b2dff']} 
         style={styles.gradient}
         start={{ x: 0, y: 0 }}
         end={{ x: 1, y: 1 }}
@@ -196,12 +197,20 @@ const LoginScreen = ({ onSendOTP }: { onSendOTP: (phone: string) => void }) => {
           {/* Header Section */}
           <View style={styles.header}>
             <View style={styles.logoContainer}>
-              <LinearGradient
+              {/* <LinearGradient
                 colors={['#FF6B6B', '#FF8E53']}
                 style={styles.logoGradient}
               >
                 <Text style={styles.logoText}>🚚</Text>
-              </LinearGradient>
+              </LinearGradient> */}
+                      {/* Logo Section */}
+        <View style={styles.logoContainer}>
+          <Image
+            source={require('../../assets/logo.png')}
+            style={styles.logo}
+            resizeMode="contain"
+          />
+        </View>
             </View>
             <Text style={styles.title}>FlashFits Delivery Boy</Text>
             <Text style={styles.subtitle}>
@@ -419,6 +428,14 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '700',
     color: '#FFFFFF',
+  },
+    logoContainer: {
+    alignItems: 'center',
+    marginBottom: 40,
+  },
+  logo: {
+    width: width * 0.6,
+    height: 80,
   },
   phoneInput: {
     flex: 1,
