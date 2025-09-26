@@ -15,6 +15,7 @@ import {
   Vibration,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
+import {verifyPhoneOtp} from '../../app/api/auth'
 
 const { width, height } = Dimensions.get('window');
 
@@ -182,8 +183,17 @@ const OTPVerificationScreen: React.FC<OTPVerificationScreenProps> = ({
   };
 
   const verifyOTP = async (otpCode: string) => {
+  console.log(phoneNumber,'phoneNumber', otp);
+  
+          try {
+        const res = await verifyPhoneOtp(phoneNumber, otp);
+        console.log("✅ OTP verification success:", res);
+      } catch (error) {
+        console.error("❌ OTP verification failed:", error);
+        alert("OTP verification failed. Please try again.");
+      }
     setIsLoading(true);
-    
+
     setTimeout(() => {
       setIsLoading(false);
       if (otpCode === '123456' || otpCode.length === 6) {

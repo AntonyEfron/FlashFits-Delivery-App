@@ -196,13 +196,6 @@ const LoginScreen = ({ onSendOTP }: { onSendOTP: (phone: string) => void }) => {
         >
           {/* Header Section */}
           <View style={styles.header}>
-            <View style={styles.logoContainer}>
-              {/* <LinearGradient
-                colors={['#FF6B6B', '#FF8E53']}
-                style={styles.logoGradient}
-              >
-                <Text style={styles.logoText}>🚚</Text>
-              </LinearGradient> */}
                       {/* Logo Section */}
         <View style={styles.logoContainer}>
           <Image
@@ -210,9 +203,9 @@ const LoginScreen = ({ onSendOTP }: { onSendOTP: (phone: string) => void }) => {
             style={styles.logo}
             resizeMode="contain"
           />
-        </View>
+
             </View>
-            <Text style={styles.title}>FlashFits Delivery Boy</Text>
+            <Text style={styles.title}>FlashFits Delivery</Text>
             <Text style={styles.subtitle}>
               Enter your phone number to continue your delivery journey
             </Text>
@@ -235,7 +228,7 @@ const LoginScreen = ({ onSendOTP }: { onSendOTP: (phone: string) => void }) => {
             >
               <View style={styles.countryCodeContainer}>
                 <LinearGradient
-                  colors={['#4F46E5', '#7C3AED']}
+                  colors={['#00000067', '#7c7c7cbc']}
                   style={styles.countryCodeGradient}
                 >
                   <Text style={styles.countryCode}>+91</Text>
@@ -365,9 +358,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginBottom: 50,
   },
-  logoContainer: {
-    marginBottom: 20,
-  },
   logoGradient: {
     width: 80,
     height: 80,
@@ -423,6 +413,7 @@ const styles = StyleSheet.create({
     paddingVertical: 18,
     justifyContent: 'center',
     alignItems: 'center',
+    borderRadius:20
   },
   countryCode: {
     fontSize: 16,

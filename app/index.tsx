@@ -9,12 +9,6 @@ export default function Index() {
   const [isLoading, setIsLoading] = useState(true);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
 
-//   useEffect(() => {
-//   }, []);
-
-  if (false) {
-    return <Text>Loading...</Text>;
-  }
 
   return <Redirect href={isAuthenticated ? '/(home)' : '/(auth)'} />;
 }
