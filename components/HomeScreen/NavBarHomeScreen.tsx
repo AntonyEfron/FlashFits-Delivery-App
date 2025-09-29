@@ -1,3 +1,4 @@
+import { router } from 'expo-router';
 import React, { useEffect, useRef } from 'react';
 import {
   View,
@@ -31,7 +32,8 @@ const DeliveryNavbar = ({ isOnline = false, onToggleOnline }) => {
   };
 
   const handleProfile = () => {
-    Alert.alert('Profile', 'Profile screen will be opened here');
+    router.replace('/(profile)')
+    // Alert.alert('Profile', 'Profile screen will be opened here');
   };
 
   return (

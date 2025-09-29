@@ -14,9 +14,10 @@ import {
   Easing,
   Vibration,
 } from 'react-native';
+import { router } from "expo-router";
 import { LinearGradient } from 'expo-linear-gradient';
 import {verifyPhoneOtp} from '../../app/api/auth'
-
+import * as SecureStore from "expo-secure-store";
 const { width, height } = Dimensions.get('window');
 
 type OTPVerificationScreenProps = {
@@ -182,78 +183,51 @@ const OTPVerificationScreen: React.FC<OTPVerificationScreenProps> = ({
     }
   };
 
-  const verifyOTP = async (otpCode: string) => {
-  console.log(phoneNumber,'phoneNumber', otp);
-  
-          try {
-        const res = await verifyPhoneOtp(phoneNumber, otp);
-        console.log("✅ OTP verification success:", res);
-      } catch (error) {
-        console.error("❌ OTP verification failed:", error);
-        alert("OTP verification failed. Please try again.");
-      }
+const verifyOTP = async (otpCode: string) => {
+  console.log(phoneNumber, "phoneNumber", otpCode);
+  try {
     setIsLoading(true);
 
-    setTimeout(() => {
-      setIsLoading(false);
-      if (otpCode === '123456' || otpCode.length === 6) {
-        // Success animation
-        Animated.sequence([
-          Animated.timing(successAnim, {
-            toValue: 1,
-            duration: 500,
-            easing: Easing.out(Easing.back(1.5)),
-            useNativeDriver: true,
-          }),
-          Animated.timing(successAnim, {
-            toValue: 0,
-            duration: 300,
-            useNativeDriver: true,
-          }),
-        ]).start();
-        
-        setTimeout(() => {
-          Alert.alert('Success! 🎉', 'Phone number verified successfully');
-        }, 800);
-      } else {
-        // Error shake animation
-        Vibration.vibrate([0, 100, 50, 100]);
-        Animated.sequence([
-          Animated.timing(shakeAnim, { 
-            toValue: 15, 
-            duration: 100, 
-            useNativeDriver: true 
-          }),
-          Animated.timing(shakeAnim, { 
-            toValue: -15, 
-            duration: 100, 
-            useNativeDriver: true 
-          }),
-          Animated.timing(shakeAnim, { 
-            toValue: 15, 
-            duration: 100, 
-            useNativeDriver: true 
-          }),
-          Animated.timing(shakeAnim, { 
-            toValue: -15, 
-            duration: 100, 
-            useNativeDriver: true 
-          }),
-          Animated.timing(shakeAnim, { 
-            toValue: 0, 
-            duration: 100, 
-            useNativeDriver: true 
-          }),
-        ]).start();
-        
-        setOtp(['', '', '', '', '', '']);
-        setTimeout(() => {
-          inputRefs.current[0]?.focus();
-        }, 500);
-        Alert.alert('Invalid OTP ❌', 'Please enter the correct verification code');
+    const res = await verifyPhoneOtp(phoneNumber, otpCode);
+    console.log("✅ OTP verification success:", res);
+
+    const { status, data } = res;
+    const rider = data?.deliveryRider;
+
+      if (status === 201 || status === 200) {
+        // Save token + verification status
+        await SecureStore.setItemAsync("token", data?.token);
+        await SecureStore.setItemAsync("isVerified", String(rider?.isVerified ?? false));
+
+        Alert.alert(
+          "Success 🎉",
+          rider?.isVerified ? "Welcome back!" : "Please complete registration."
+        );
+        // Always redirect to index, let index.tsx decide
+        router.replace("/");
       }
-    }, 2000);
-  };
+  } catch (error: any) {
+    console.error("❌ OTP verification failed:", error);
+    Alert.alert(
+      "OTP verification failed ❌",
+      error.response?.data?.message || "Please try again."
+    );
+
+    // Error shake animation
+    Vibration.vibrate([0, 100, 50, 100]);
+    Animated.sequence([
+      Animated.timing(shakeAnim, { toValue: 15, duration: 100, useNativeDriver: true }),
+      Animated.timing(shakeAnim, { toValue: -15, duration: 100, useNativeDriver: true }),
+      Animated.timing(shakeAnim, { toValue: 0, duration: 100, useNativeDriver: true }),
+    ]).start();
+
+    setOtp(["", "", "", "", "", ""]);
+    setTimeout(() => inputRefs.current[0]?.focus(), 500);
+  } finally {
+    setIsLoading(false);
+  }
+};
+
 
   const handleResendOTP = () => {
     setTimer(30);
