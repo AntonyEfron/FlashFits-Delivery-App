@@ -18,6 +18,8 @@ import { router } from "expo-router";
 import { LinearGradient } from 'expo-linear-gradient';
 import {verifyPhoneOtp} from '../../app/api/auth'
 import * as SecureStore from "expo-secure-store";
+import { connectRiderSocket } from '../../config/socketConfig';
+
 const { width, height } = Dimensions.get('window');
 
 type OTPVerificationScreenProps = {
@@ -198,6 +200,8 @@ const verifyOTP = async (otpCode: string) => {
         // Save token + verification status
         await SecureStore.setItemAsync("token", data?.token);
         await SecureStore.setItemAsync("isVerified", String(rider?.isVerified ?? false));
+        await SecureStore.setItemAsync("deliveryRiderId", String(rider?.id ?? ""));
+        await connectRiderSocket(rider?.id);
 
         Alert.alert(
           "Success 🎉",

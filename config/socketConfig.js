@@ -45,7 +45,6 @@ export const disconnectRiderSocket = () => {
   }
 };
 
-
 export const registerRiderOrderListeners = (socket) => {
   socket.on("newOrder", (order) => {
     emitter.emit("newOrder", order);
