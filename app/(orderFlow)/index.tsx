@@ -1,5 +1,4 @@
 import React, { useState } from 'react';
-import { View } from 'react-native';
 import AcceptOrder from './AcceptOrder';
 import ReachPickup from './ReachPickup';
 import PickupDetails from './PickupDetails';
@@ -21,8 +20,7 @@ const OrderFlow: React.FC = () => {
     <EarningsSummary key="earnings" onFinish={() => router.push('/(home)')} />,
   ];
 
-  return <View style={{ flex: 1 }}>{screens[step]}</View>;
+  return <>{screens[step]}</>; // remove the wrapping <View>
 };
 
 export default OrderFlow;
- 

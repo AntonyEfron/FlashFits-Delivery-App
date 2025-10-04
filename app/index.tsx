@@ -16,6 +16,8 @@ export default function Index() {
   }
   const [isLoading, setIsLoading] = useState(true);
   const [redirectPath, setRedirectPath] = useState<"/(home)" | "/(auth)" | "/(register)">("/(auth)");
+  // const [redirectPath, setRedirectPath] = useState("/(home)");
+
 
   useEffect(() => {
     const checkAuth = async () => {
@@ -52,5 +54,5 @@ export default function Index() {
     );
   }
 
-  return <Redirect href={redirectPath} />;
+  return <Redirect href={'/(home)'} />;
 }
