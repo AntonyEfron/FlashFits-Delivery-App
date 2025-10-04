@@ -1,9 +1,19 @@
 import { useEffect, useState } from "react";
 import { Redirect } from "expo-router";
 import * as SecureStore from "expo-secure-store";
-import { ActivityIndicator, View } from "react-native";
+import { ActivityIndicator, View, Text } from "react-native";
+import { useLocationPermission } from "../hooks/useLocationPermission";
 
 export default function Index() {
+  const hasLocationPermission = useLocationPermission();
+  if (!hasLocationPermission) {
+    return (
+      <View className="flex-1 items-center justify-center bg-white">
+        <ActivityIndicator size="large" />
+        <Text style={{ marginTop: 10 }}>Waiting for location permission...</Text>
+      </View>
+    );
+  }
   const [isLoading, setIsLoading] = useState(true);
   const [redirectPath, setRedirectPath] = useState<"/(home)" | "/(auth)" | "/(register)">("/(auth)");
 

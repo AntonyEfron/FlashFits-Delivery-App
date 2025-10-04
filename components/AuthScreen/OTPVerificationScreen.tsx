@@ -201,7 +201,7 @@ const verifyOTP = async (otpCode: string) => {
         await SecureStore.setItemAsync("token", data?.token);
         await SecureStore.setItemAsync("isVerified", String(rider?.isVerified ?? false));
         await SecureStore.setItemAsync("deliveryRiderId", String(rider?.id ?? ""));
-        await connectRiderSocket(rider?.id);
+        // connectRiderSocket(rider?.id);
 
         Alert.alert(
           "Success 🎉",
