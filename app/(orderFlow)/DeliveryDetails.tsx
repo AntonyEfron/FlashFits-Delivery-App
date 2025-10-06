@@ -1,48 +1,54 @@
 import React, { useState, useEffect } from 'react';
 import { View, Text, TouchableOpacity, ScrollView, StyleSheet, Alert } from 'react-native';
-import { Ionicons, MaterialIcons, MaterialCommunityIcons } from '@expo/vector-icons';
+import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
+import { AnimatedDots } from '../../components/OrderFlowComponents/AnimatedDots';
 
-// Mock data - replace with actual data from your backend
 const MOCK_ORDER = {
   orderId: 'ORD-2024-001',
   customerName: 'John Doe',
   customerPhone: '+91 9876543210',
   address: '221B Baker Street, Sector 5, Bangalore',
   items: [
-    { id: 1, name: 'Blue Cotton Shirt', price: 899, image: '👕' },
-    { id: 2, name: 'Black Formal Pants', price: 1299, image: '👖' },
-    { id: 3, name: 'Leather Belt', price: 499, image: '👔' },
+    { id: 1, name: 'Blue Cotton Shirt', qty: 1, image: '👕' },
+    { id: 2, name: 'Black Formal Pants', qty: 1, image: '👖' },
+    { id: 3, name: 'Leather Belt', qty: 1, image: '👔' },
   ],
   totalAmount: 2697,
-  tryDuration: 600, // 10 minutes in seconds
+  tryDuration: 600, // seconds (10 minutes)
 };
 
-type DeliveryStatus = 'pending' | 'trying' | 'selecting' | 'returning' | 'completed';
+type DeliveryStatus = 'pending' | 'trying';
 
-const DeliveryDetails = () => {
+const DeliveryDetails = ({
+  onNext,
+}: {
+  onNext: (route: 'earnings' | 'returnVerification') => void;
+}) => {
   const [status, setStatus] = useState<DeliveryStatus>('pending');
-  const [timeRemaining, setTimeRemaining] = useState(MOCK_ORDER.tryDuration);
-  const [selectedItems, setSelectedItems] = useState<number[]>([]);
-  const [returnItems, setReturnItems] = useState<number[]>([]);
+  const [timeElapsed, setTimeElapsed] = useState(0);
 
-  // Timer for try phase
+  /** Timer effect for Try & Buy */
   useEffect(() => {
-    let interval: NodeJS.Timeout;
-    
-    if (status === 'trying' && timeRemaining > 0) {
-      interval = setInterval(() => {
-        setTimeRemaining((prev) => {
-          if (prev <= 1) {
-            setStatus('selecting');
-            return 0;
-          }
-          return prev - 1;
-        });
-      }, 1000);
-    }
+    if (status !== 'trying') return;
+    const timer = setInterval(() => {
+      setTimeElapsed((prev) => {
+        if (prev + 1 >= MOCK_ORDER.tryDuration) {
+          clearInterval(timer);
+          handleTryPeriodEnd();
+          return MOCK_ORDER.tryDuration;
+        }
+        return prev + 1;
+      });
+    }, 1000);
+    return () => clearInterval(timer);
+  }, [status]);
 
-    return () => clearInterval(interval);
-  }, [status, timeRemaining]);
+  const handleTryPeriodEnd = () => {
+    Alert.alert('Customer Decision', 'Did the customer buy all the clothes?', [
+      { text: 'Yes, all bought', onPress: () => onNext('earnings') },
+      { text: 'No, some returned', onPress: () => onNext('returnVerification') },
+    ]);
+  };
 
   const formatTime = (seconds: number) => {
     const mins = Math.floor(seconds / 60);
@@ -50,55 +56,12 @@ const DeliveryDetails = () => {
     return `${mins}:${secs.toString().padStart(2, '0')}`;
   };
 
-  const handleHandover = () => {
-    setStatus('trying');
-  };
+  const handleHandover = () => setStatus('trying');
 
-  const handleCall = () => {
-    Alert.alert('Call Customer', `Calling ${MOCK_ORDER.customerPhone}`);
-  };
+  const handleCall = () => Alert.alert('Call Customer', `Calling ${MOCK_ORDER.customerPhone}`);
+  const handleMap = () => Alert.alert('Navigation', 'Opening Google Maps...');
 
-  const handleMap = () => {
-    Alert.alert('Navigation', 'Opening Google Maps...');
-  };
-
-  const toggleItemSelection = (itemId: number) => {
-    setSelectedItems(prev =>
-      prev.includes(itemId)
-        ? prev.filter(id => id !== itemId)
-        : [...prev, itemId]
-    );
-  };
-
-  const handleProceedToPayment = () => {
-    if (selectedItems.length === 0) {
-      Alert.alert('No Items Selected', 'Please select at least one item to purchase');
-      return;
-    }
-
-    const unselectedItems = MOCK_ORDER.items
-      .filter(item => !selectedItems.includes(item.id))
-      .map(item => item.id);
-
-    if (unselectedItems.length > 0) {
-      setReturnItems(unselectedItems);
-      setStatus('returning');
-    } else {
-      setStatus('completed');
-    }
-  };
-
-  const handleReturnConfirmed = () => {
-    setStatus('completed');
-  };
-
-  const calculateTotal = () => {
-    return MOCK_ORDER.items
-      .filter(item => selectedItems.includes(item.id))
-      .reduce((sum, item) => sum + item.price, 0);
-  };
-
-  // Pending/Delivery Screen
+  /** PENDING STATE */
   if (status === 'pending') {
     return (
       <ScrollView style={styles.containerBlue} contentContainerStyle={styles.scrollContent}>
@@ -111,55 +74,28 @@ const DeliveryDetails = () => {
           </View>
 
           <View style={styles.section}>
-            <View style={styles.infoCard}>
-              <Text style={styles.infoLabel}>Order ID</Text>
-              <Text style={styles.infoValue}>{MOCK_ORDER.orderId}</Text>
-            </View>
-
-            <View style={styles.infoCard}>
-              <Text style={styles.infoLabel}>Customer Name</Text>
-              <Text style={styles.infoValue}>{MOCK_ORDER.customerName}</Text>
-            </View>
-
-            <View style={styles.infoCard}>
-              <Text style={styles.infoLabel}>Delivery Address</Text>
-              <Text style={styles.infoText}>{MOCK_ORDER.address}</Text>
-            </View>
+            <Info label="Order ID" value={MOCK_ORDER.orderId} />
+            <Info label="Customer Name" value={MOCK_ORDER.customerName} />
+            <Info label="Delivery Address" value={MOCK_ORDER.address} />
 
             <View style={styles.infoCard}>
               <Text style={styles.infoLabel}>Items ({MOCK_ORDER.items.length})</Text>
-              <View style={styles.itemsList}>
-                {MOCK_ORDER.items.map(item => (
-                  <View key={item.id} style={styles.itemRow}>
-                    <Text style={styles.itemText}>
-                      {item.image} {item.name}
-                    </Text>
-                    <Text style={styles.itemPrice}>₹{item.price}</Text>
-                  </View>
-                ))}
-              </View>
-            </View>
-
-            <View style={styles.totalCard}>
-              <Text style={styles.totalLabel}>Total Amount</Text>
-              <Text style={styles.totalAmount}>₹{MOCK_ORDER.totalAmount}</Text>
+              {MOCK_ORDER.items.map((item) => (
+                <View key={item.id} style={styles.itemRow}>
+                  <Text style={styles.itemText}>{item.image} {item.name}</Text>
+                  <Text style={styles.itemPrice}>× {item.qty}</Text>
+                </View>
+              ))}
             </View>
           </View>
 
           <View style={styles.buttonRow}>
-            <TouchableOpacity style={styles.buttonGreen} onPress={handleCall}>
-              <Ionicons name="call" size={20} color="white" />
-              <Text style={styles.buttonText}>Call Customer</Text>
-            </TouchableOpacity>
-
-            <TouchableOpacity style={styles.buttonBlue} onPress={handleMap}>
-              <Ionicons name="map" size={20} color="white" />
-              <Text style={styles.buttonText}>Open Map</Text>
-            </TouchableOpacity>
+            <ActionButton color="#22c55e" icon="call" text="Call Customer" onPress={handleCall} />
+            <ActionButton color="#3b82f6" icon="map" text="Open Map" onPress={handleMap} />
           </View>
 
           <TouchableOpacity style={styles.primaryButton} onPress={handleHandover}>
-            <MaterialCommunityIcons name="package-variant" size={24} color="white" />
+            <MaterialCommunityIcons name="package-variant" size={22} color="#fff" />
             <Text style={styles.primaryButtonText}>Handover Package (Start Try Period)</Text>
           </TouchableOpacity>
         </View>
@@ -167,10 +103,10 @@ const DeliveryDetails = () => {
     );
   }
 
-  // Trying Phase Screen
+  /** TRYING STATE */
   if (status === 'trying') {
-    const percentage = (timeRemaining / MOCK_ORDER.tryDuration) * 100;
-    
+    const progress = (timeElapsed / MOCK_ORDER.tryDuration) * 100;
+
     return (
       <ScrollView style={styles.containerAmber} contentContainerStyle={styles.scrollContent}>
         <View style={styles.card}>
@@ -183,10 +119,10 @@ const DeliveryDetails = () => {
           </View>
 
           <View style={styles.timerCard}>
-            <Text style={styles.timerLabel}>Time Remaining</Text>
-            <Text style={styles.timerValue}>{formatTime(timeRemaining)}</Text>
+            <Text style={styles.timerLabel}>Elapsed Time</Text>
+            <Text style={styles.timerValue}>{formatTime(timeElapsed)}</Text>
             <View style={styles.progressBarBg}>
-              <View style={[styles.progressBar, { width: `${percentage}%` }]} />
+              <View style={[styles.progressBar, { width: `${progress}%` }]} />
             </View>
           </View>
 
@@ -195,227 +131,19 @@ const DeliveryDetails = () => {
               <MaterialCommunityIcons name="package-variant" size={20} color="#1e3a8a" />
               <Text style={styles.cardHeaderText}>Items Being Tried</Text>
             </View>
-            <View style={styles.itemsList}>
-              {MOCK_ORDER.items.map(item => (
-                <View key={item.id} style={styles.itemRowSmall}>
-                  <Text style={styles.itemTextSmall}>
-                    {item.image} {item.name}
-                  </Text>
-                  <Text style={styles.itemPriceSmall}>₹{item.price}</Text>
-                </View>
-              ))}
-            </View>
-          </View>
-
-          <TouchableOpacity 
-            style={styles.buttonGreenLarge} 
-            onPress={() => setStatus('selecting')}
-          >
-            <Text style={styles.primaryButtonText}>Customer Ready to Select Items</Text>
-          </TouchableOpacity>
-        </View>
-      </ScrollView>
-    );
-  }
-
-  // Item Selection Screen
-  if (status === 'selecting') {
-    return (
-      <ScrollView style={styles.containerPurple} contentContainerStyle={styles.scrollContent}>
-        <View style={styles.card}>
-          <Text style={styles.headerTitle}>Select Items to Purchase</Text>
-          <Text style={styles.subtitle}>Tap on items the customer wants to buy</Text>
-
-          <View style={styles.section}>
-            {MOCK_ORDER.items.map(item => (
-              <TouchableOpacity
-                key={item.id}
-                onPress={() => toggleItemSelection(item.id)}
-                style={[
-                  styles.selectableItem,
-                  selectedItems.includes(item.id) && styles.selectedItem
-                ]}
-              >
-                <View style={styles.itemContent}>
-                  <View style={styles.itemLeft}>
-                    <Text style={styles.itemEmoji}>{item.image}</Text>
-                    <View>
-                      <Text style={styles.itemName}>{item.name}</Text>
-                      <Text style={styles.itemPriceLarge}>₹{item.price}</Text>
-                    </View>
-                  </View>
-                  <View>
-                    {selectedItems.includes(item.id) ? (
-                      <Ionicons name="checkmark-circle" size={32} color="#22c55e" />
-                    ) : (
-                      <View style={styles.uncheckedCircle} />
-                    )}
-                  </View>
-                </View>
-              </TouchableOpacity>
+            {MOCK_ORDER.items.map((item) => (
+              <View key={item.id} style={styles.itemRowSmall}>
+                <Text style={styles.itemTextSmall}>{item.image} {item.name}</Text>
+                <Text style={styles.itemPriceSmall}>× {item.qty}</Text>
+              </View>
             ))}
           </View>
 
-          {selectedItems.length > 0 && (
-            <View style={styles.summaryCard}>
-              <View>
-                <Text style={styles.summaryLabel}>Total Amount</Text>
-                <Text style={styles.summaryAmount}>₹{calculateTotal()}</Text>
-                <Text style={styles.summarySubtext}>
-                  {selectedItems.length} of {MOCK_ORDER.items.length} items selected
-                </Text>
-              </View>
-              <MaterialIcons name="attach-money" size={48} color="rgba(255,255,255,0.8)" />
+          <TouchableOpacity style={styles.buttonGreenLarge} onPress={handleTryPeriodEnd}>
+            <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+              <Text style={styles.primaryButtonText}>Waiting for the return</Text>
+              <AnimatedDots />
             </View>
-          )}
-
-          <TouchableOpacity
-            style={[
-              styles.primaryButtonPurple,
-              selectedItems.length === 0 && styles.disabledButton
-            ]}
-            onPress={handleProceedToPayment}
-            disabled={selectedItems.length === 0}
-          >
-            <Text style={[
-              styles.primaryButtonText,
-              selectedItems.length === 0 && styles.disabledButtonText
-            ]}>
-              Proceed to Payment
-            </Text>
-          </TouchableOpacity>
-        </View>
-      </ScrollView>
-    );
-  }
-
-  // Return Items Screen
-  if (status === 'returning') {
-    const returnItemsList = MOCK_ORDER.items.filter(item => returnItems.includes(item.id));
-    
-    return (
-      <ScrollView style={styles.containerRed} contentContainerStyle={styles.scrollContent}>
-        <View style={styles.card}>
-          <View style={styles.centerContent}>
-            <View style={styles.iconCircleRed}>
-              <Ionicons name="close-circle" size={48} color="#dc2626" />
-            </View>
-            <Text style={styles.headerTitle}>Return Items</Text>
-            <Text style={styles.subtitle}>Collect the following items from customer</Text>
-          </View>
-
-          <View style={styles.returnCard}>
-            <View style={styles.cardHeader}>
-              <MaterialCommunityIcons name="package-variant" size={20} color="#7f1d1d" />
-              <Text style={styles.cardHeaderTextRed}>Items to Return ({returnItemsList.length})</Text>
-            </View>
-            <View style={styles.returnItemsList}>
-              {returnItemsList.map(item => (
-                <View key={item.id} style={styles.returnItemCard}>
-                  <View style={styles.returnItemContent}>
-                    <Text style={styles.returnItemEmoji}>{item.image}</Text>
-                    <View>
-                      <Text style={styles.returnItemName}>{item.name}</Text>
-                      <Text style={styles.returnItemPrice}>₹{item.price}</Text>
-                    </View>
-                  </View>
-                </View>
-              ))}
-            </View>
-          </View>
-
-          <View style={styles.purchasedCard}>
-            <View style={styles.cardHeader}>
-              <Ionicons name="checkmark-circle" size={20} color="#14532d" />
-              <Text style={styles.cardHeaderTextGreen}>Purchased Items ({selectedItems.length})</Text>
-            </View>
-            <View style={styles.itemsList}>
-              {MOCK_ORDER.items
-                .filter(item => selectedItems.includes(item.id))
-                .map(item => (
-                  <View key={item.id} style={styles.itemRowSmall}>
-                    <Text style={styles.itemTextSmall}>
-                      {item.image} {item.name}
-                    </Text>
-                    <Text style={styles.itemPriceSmall}>₹{item.price}</Text>
-                  </View>
-                ))}
-              <View style={styles.totalDivider} />
-              <View style={styles.totalRow}>
-                <Text style={styles.totalRowLabel}>Total Paid</Text>
-                <Text style={styles.totalRowAmount}>₹{calculateTotal()}</Text>
-              </View>
-            </View>
-          </View>
-
-          <TouchableOpacity style={styles.buttonGreenLarge} onPress={handleReturnConfirmed}>
-            <Text style={styles.primaryButtonText}>Confirm Return & Complete Delivery</Text>
-          </TouchableOpacity>
-        </View>
-      </ScrollView>
-    );
-  }
-
-  // Completion/Earnings Screen
-  if (status === 'completed') {
-    const earnings = calculateTotal() * 0.1;
-    
-    return (
-      <ScrollView style={styles.containerGreen} contentContainerStyle={styles.scrollContent}>
-        <View style={styles.card}>
-          <View style={styles.centerContent}>
-            <View style={styles.iconCircleGreen}>
-              <Ionicons name="checkmark-circle" size={48} color="#16a34a" />
-            </View>
-            <Text style={styles.headerTitle}>Delivery Completed!</Text>
-            <Text style={styles.subtitle}>Great job on completing this delivery</Text>
-          </View>
-
-          <View style={styles.earningsCard}>
-            <Text style={styles.earningsLabel}>Your Earnings</Text>
-            <Text style={styles.earningsAmount}>₹{earnings.toFixed(2)}</Text>
-            <Text style={styles.earningsSubtext}>From this delivery</Text>
-          </View>
-
-          <View style={styles.section}>
-            <View style={styles.infoCard}>
-              <Text style={styles.infoLabel}>Order ID</Text>
-              <Text style={styles.infoValue}>{MOCK_ORDER.orderId}</Text>
-            </View>
-
-            <View style={styles.infoCard}>
-              <Text style={styles.infoLabel}>Order Summary</Text>
-              <View style={styles.summaryRow}>
-                <Text style={styles.summaryRowLabel}>Items Purchased</Text>
-                <Text style={styles.summaryRowValue}>{selectedItems.length}</Text>
-              </View>
-              {returnItems.length > 0 && (
-                <View style={styles.summaryRow}>
-                  <Text style={styles.summaryRowLabel}>Items Returned</Text>
-                  <Text style={styles.summaryRowValue}>{returnItems.length}</Text>
-                </View>
-              )}
-            </View>
-
-            <View style={styles.paymentSummaryCard}>
-              <Text style={styles.paymentLabel}>Payment Summary</Text>
-              <View style={styles.paymentRow}>
-                <Text style={styles.paymentRowLabel}>Total Collected</Text>
-                <Text style={styles.paymentAmount}>₹{calculateTotal()}</Text>
-              </View>
-            </View>
-          </View>
-
-          <TouchableOpacity
-            style={styles.primaryButton}
-            onPress={() => {
-              setStatus('pending');
-              setTimeRemaining(MOCK_ORDER.tryDuration);
-              setSelectedItems([]);
-              setReturnItems([]);
-            }}
-          >
-            <Text style={styles.primaryButtonText}>Next Delivery</Text>
           </TouchableOpacity>
         </View>
       </ScrollView>
@@ -424,6 +152,31 @@ const DeliveryDetails = () => {
 
   return null;
 };
+
+/** Reusable Small Components */
+const Info = ({ label, value }: { label: string; value: string }) => (
+  <View style={styles.infoCard}>
+    <Text style={styles.infoLabel}>{label}</Text>
+    <Text style={styles.infoValue}>{value}</Text>
+  </View>
+);
+
+const ActionButton = ({
+  color,
+  icon,
+  text,
+  onPress,
+}: {
+  color: string;
+  icon: keyof typeof Ionicons.glyphMap;
+  text: string;
+  onPress: () => void;
+}) => (
+  <TouchableOpacity style={[styles.actionButton, { backgroundColor: color }]} onPress={onPress}>
+    <Ionicons name={icon} size={20} color="#fff" />
+    <Text style={styles.buttonText}>{text}</Text>
+  </TouchableOpacity>
+);
 
 const styles = StyleSheet.create({
   containerBlue: {
@@ -587,11 +340,11 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     gap: 8,
   },
-  primaryButtonText: {
-    color: 'white',
-    fontSize: 16,
-    fontWeight: 'bold',
-  },
+  // primaryButtonText: {
+  //   color: 'white',
+  //   fontSize: 16,
+  //   fontWeight: 'bold',
+  // },
   centerContent: {
     alignItems: 'center',
     marginBottom: 32,
@@ -604,6 +357,24 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     marginBottom: 16,
+  },
+    buttonGreenLarge: {
+    backgroundColor: '#16a34a',
+    paddingVertical: 16,
+    paddingHorizontal: 24,
+    borderRadius: 12,
+    alignItems: 'center',
+  },
+  primaryButtonText: {
+    // your existing text styles
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  dot: {
+    color: '#fff',
+    fontSize: 20,
+    marginHorizontal: 2,
   },
   iconCircleRed: {
     width: 96,

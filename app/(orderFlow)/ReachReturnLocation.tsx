@@ -5,34 +5,32 @@ type Props = {
   onNext: () => void;
 };
 
-export default function ReachDeliveryLocation({ onNext }: Props) {
-return (
+export default function ReachReturnLocation({ onNext }: Props) {
+  return (
     <View style={styles.root}>
       {/* Map or placeholder */}
       <View style={styles.mapContainer} />
 
-
+      {/* Route instruction text */}
+      <View style={styles.routeInstructionContainer}>
+        <Text style={styles.routeInstructionText}>Take the route to return location</Text>
+      </View>
 
       {/* Bottom sheet */}
       <View style={styles.sheet}>
-              {/* Route instruction text */}
-      <View style={styles.routeInstructionContainer}>
-        <Text style={styles.routeInstructionText}>Take the route to customer</Text>
-      </View>
-        
-        <Text style={styles.locationLabel}>DELIVERY LOCATION</Text>
+        <Text style={styles.locationLabel}>RETURN LOCATION</Text>
 
         <View style={styles.addressRow}>
           <View>
             <Text style={styles.addressTitle}>
-              John Smith
+              Warehouse Hub
             </Text>
-            <Text style={styles.addressDetails}>123 Main Street, Downtown</Text>
+            <Text style={styles.addressDetails}>456 Industrial Park, Sector 5</Text>
           </View>
         </View>
 
         <TouchableOpacity style={styles.button} onPress={onNext}>
-          <Text style={styles.buttonText}>Customer Location Reached</Text>
+          <Text style={styles.buttonText}>Return Location Reached</Text>
         </TouchableOpacity>
       </View>
     </View>
@@ -47,7 +45,7 @@ const styles = StyleSheet.create({
   },
   routeInstructionContainer: {
     position: 'absolute',
-    bottom:200, // Adjust this value based on your sheet height
+    bottom: 200,
     left: 0,
     right: 0,
     alignItems: 'center',
@@ -70,7 +68,8 @@ const styles = StyleSheet.create({
   sheet: {
     position: 'absolute',
     bottom: 0,
-    left: 0, right: 0,
+    left: 0,
+    right: 0,
     backgroundColor: '#fff',
     borderTopLeftRadius: 22,
     borderTopRightRadius: 22,
@@ -106,12 +105,6 @@ const styles = StyleSheet.create({
     fontFamily: 'System',
     fontSize: 14,
     width: 240,
-  },
-  changeText: {
-    color: '#ee6e46',
-    fontWeight: '700',
-    fontSize: 14,
-    padding: 8,
   },
   button: {
     backgroundColor: '#ff5035',
