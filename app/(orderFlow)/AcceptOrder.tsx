@@ -20,7 +20,10 @@ const AcceptOrder: React.FC<AcceptOrderProps> = ({ onNext }) => {
       modalHeight={300} // approximate height for your content
       handleStyle={{ backgroundColor: '#ccc' }}
       overlayStyle={{ backgroundColor: 'rgba(0,0,0,0.3)' }}
-      closeOnOverlayTap={false} 
+        closeOnOverlayTap={false}   // Prevent closing on tap outside
+        panGestureEnabled={false}   // Disable dragging down to close
+        disableScrollIfPossible={true} // Disable scroll if not needed
+        withHandle={true} 
     >
       <View style={styles.container}>
         <Text style={styles.title}>New Order Request</Text>

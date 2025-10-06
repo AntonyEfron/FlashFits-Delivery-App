@@ -15,8 +15,8 @@ interface PickupDetailsProps {
 
 const PickupDetails: React.FC<PickupDetailsProps> = ({ onNext }) => {
   const [code, setCode] = useState<string>("");
-  const [itemsExpanded, setItemsExpanded] = useState<boolean>(false);
-  const [notesExpanded, setNotesExpanded] = useState<boolean>(false);
+  const [itemsExpanded, setItemsExpanded] = useState<boolean>(true);
+  const [notesExpanded, setNotesExpanded] = useState<boolean>(true);
 
   // Sample order data - replace with actual props
   const orderData = {
@@ -26,7 +26,7 @@ const PickupDetails: React.FC<PickupDetailsProps> = ({ onNext }) => {
     pickupAddress: "123 Main Street, Downtown",
     storeName: "Fresh Market Store",
     totalItems: 3,
-    estimatedWeight: "2.5 kg",
+    Distance: "2.5 Km",
     specialInstructions: "Handle with care - contains fragile items",
     items: [
       { id: "1", name: "Fresh Organic Tomatoes", quantity: 2, sku: "VEG-001", notes: "Red, ripe" },
@@ -58,6 +58,34 @@ const PickupDetails: React.FC<PickupDetailsProps> = ({ onNext }) => {
         </View>
 
         
+                {/* Verification Code Input */}
+        <View style={styles.verificationCard}>
+          <Text style={styles.verificationTitle}>🔐 Ask for the Verification Pin</Text>
+          <Text style={styles.verificationSubtext}>Enter the pickup code provided by the store</Text>
+          <TextInput
+            style={styles.input}
+            placeholder="Enter 4-digit code"
+            value={code}
+            onChangeText={setCode}
+            keyboardType="number-pad"
+            maxLength={4}
+          />
+        </View>
+
+                {/* Action Buttons */}
+      <TouchableOpacity 
+        style={[
+          styles.button, 
+          styles.primaryButton, 
+          code.length !== 4 && styles.buttonDisabled
+        ]} 
+        onPress={onNext}
+        disabled={code.length !== 4} // disabled unless 6 digits are entered
+      >
+        <Text style={styles.buttonText}>✓ Verify & Confirm Pickup</Text>
+      </TouchableOpacity>
+
+        
         {/* Order Summary */}
         <View style={styles.card}>
           <Text style={styles.cardTitle}>📦 Order Summary</Text>
@@ -67,8 +95,8 @@ const PickupDetails: React.FC<PickupDetailsProps> = ({ onNext }) => {
               <Text style={styles.summaryLabel}>Total Items</Text>
             </View>
             <View style={styles.summaryItem}>
-              <Text style={styles.summaryValue}>{orderData.estimatedWeight}</Text>
-              <Text style={styles.summaryLabel}>Est. Weight</Text>
+              <Text style={styles.summaryValue}>{orderData.Distance}</Text>
+              <Text style={styles.summaryLabel}>Est. Distance</Text>
             </View>
           </View>
         </View> 
@@ -98,32 +126,6 @@ const PickupDetails: React.FC<PickupDetailsProps> = ({ onNext }) => {
           )}
         </TouchableOpacity>
 
-                {/* Verification Code Input */}
-        <View style={styles.verificationCard}>
-          <Text style={styles.verificationTitle}>🔐 Verification Required</Text>
-          <Text style={styles.verificationSubtext}>Enter the pickup code provided by the store</Text>
-          <TextInput
-            style={styles.input}
-            placeholder="Enter 4-digit code"
-            value={code}
-            onChangeText={setCode}
-            keyboardType="number-pad"
-            maxLength={4}
-          />
-        </View>
-
-                {/* Action Buttons */}
-      <TouchableOpacity 
-        style={[
-          styles.button, 
-          styles.primaryButton, 
-          code.length !== 4 && styles.buttonDisabled
-        ]} 
-        onPress={onNext}
-        disabled={code.length !== 4} // disabled unless 6 digits are entered
-      >
-        <Text style={styles.buttonText}>✓ Verify & Confirm Pickup</Text>
-      </TouchableOpacity>
 
         {/* Customer Information */}
         {/* <View style={styles.card}>
@@ -159,7 +161,7 @@ const PickupDetails: React.FC<PickupDetailsProps> = ({ onNext }) => {
 
         <View style={styles.bottomSpacing} />
       </View>
-      <View style={{ height: 230 }} />
+      {/* <View style={{ height: 230 }} /> */}
     </ScrollView>
     // </SafeAreaView>
   );
