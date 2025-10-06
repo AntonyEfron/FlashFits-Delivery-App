@@ -1,5 +1,6 @@
 // src/config/riderSocket.ts
-import { io } from "socket.io-client";
+import io from "socket.io-client/dist/socket.io";
+
 import mitt from "mitt";
 import Constants from "expo-constants";
 // import { registerRiderOrderListeners } from "./orderListeners";
@@ -15,6 +16,7 @@ export const emitter = mitt();
  * @param riderId string
  */
 export const connectRiderSocket = (riderId) => {
+    console.log("✅ Rider connected to socket:", socket?.id);
   const role = "deliveryRider";
 
   socket = io(Constants.expoConfig.extra.BACKEND_URL, {
@@ -32,10 +34,35 @@ export const connectRiderSocket = (riderId) => {
     console.log("❌ Rider disconnected from socket");
   });
 
+  socket.on("newOrder", (order) => {
+    emitter.emit("newOrder", order);
+});
+
+socket.on("orderUpdate", (order) => {
+    emitter.emit("orderUpdate", order);
+});
+
   // Listen for order updates
-  registerRiderOrderListeners(socket);
+//   registerRiderOrderListeners(socket);
 
   return socket;
+};
+
+
+// export const registerRiderOrderListeners = (socket) => {
+//     socket.on("newOrder", (order) => {
+//         emitter.emit("newOrder", order);
+//     });
+    
+//     socket.on("orderUpdate", (order) => {
+//         emitter.emit("orderUpdate", order);
+//     });
+// };
+
+export const sendRiderLocation = (riderId, coords) => {
+    if (!socket) return;
+    console.log("✅ Rider location sent to socket:", riderId);
+    socket.emit("riderLocationUpdate", { riderId, coords });
 };
 
 export const disconnectRiderSocket = () => {
@@ -43,14 +70,4 @@ export const disconnectRiderSocket = () => {
     socket.disconnect();
     socket = null;
   }
-};
-
-export const registerRiderOrderListeners = (socket) => {
-  socket.on("newOrder", (order) => {
-    emitter.emit("newOrder", order);
-  });
-
-  socket.on("orderUpdate", (order) => {
-    emitter.emit("orderUpdate", order);
-  });
 };

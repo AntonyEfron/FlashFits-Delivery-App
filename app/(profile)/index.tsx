@@ -35,13 +35,14 @@ const ProfilePage = ({ navigation }) => {
             try {
               // Delete the token from SecureStore
               await SecureStore.deleteItemAsync("token");
+              await SecureStore.deleteItemAsync("deliveryRiderId");
               
               console.log('User logged out and token deleted');
               
               // Navigate to login screen or reset navigation stack
               navigation.reset({
                 index: 0,
-                routes: [{ name: '/(auth)' }],
+                routes: [{ name: '/' }],
               });
             } catch (error) {
               console.error('Error during logout:', error);

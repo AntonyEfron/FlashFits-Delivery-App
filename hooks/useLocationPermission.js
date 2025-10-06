@@ -42,5 +42,5 @@ export const useLocationPermission = () => {
     })();
   }, []);
 
-  return hasPermission;
+  return { hasPermission, locationEnabled };
 };

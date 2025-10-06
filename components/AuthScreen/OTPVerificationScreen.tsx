@@ -191,16 +191,22 @@ const verifyOTP = async (otpCode: string) => {
     setIsLoading(true);
 
     const res = await verifyPhoneOtp(phoneNumber, otpCode);
-    console.log("✅ OTP verification success:", res);
+    console.log("✅ OTP verification success:", res.data);
 
     const { status, data } = res;
+    console.log(status, "status");
+    
     const rider = data?.deliveryRider;
+    console.log(rider, "rider");
+    
 
       if (status === 201 || status === 200) {
         // Save token + verification status
-        await SecureStore.setItemAsync("token", data?.token);
-        await SecureStore.setItemAsync("isVerified", String(rider?.isVerified ?? false));
-        await SecureStore.setItemAsync("deliveryRiderId", String(rider?.id ?? ""));
+        await Promise.all([
+          SecureStore.setItemAsync("token", data?.token ?? ""),
+          SecureStore.setItemAsync("isVerified", String(rider?.isVerified ?? false)),
+          SecureStore.setItemAsync("deliveryRiderId", String(rider?._id ?? "")),
+        ]);
         // await connectRiderSocket(rider?.id);
 
         Alert.alert(

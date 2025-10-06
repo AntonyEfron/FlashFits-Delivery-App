@@ -24,6 +24,7 @@
     "expo-secure-store": "^15.0.7",
     "expo-status-bar": "~3.0.8",
     "lucide-react-native": "^0.517.0",
+    "mitt": "^3.0.1",
     "nativewind": "^4.2.1",
     "react": "19.1.0",
     "react-native": "0.81.4",
@@ -36,6 +37,7 @@
     "react-native-url-polyfill": "^2.0.0",
     "react-native-web": "^0.21.1",
     "react-native-worklets": "^0.5.1",
+    "socket.io-client": "^4.8.1",
     "url-parse": "^1.5.10"
   },
   "devDependencies": {
