@@ -59,10 +59,10 @@ socket.on("orderUpdate", (order) => {
 //     });
 // };
 
-export const sendRiderLocation = (riderId, coords) => {
+export const sendRiderLocation = (riderId, lat, lng) => {
     if (!socket) return;
     console.log("✅ Rider location sent to socket:", riderId);
-    socket.emit("riderLocationUpdate", { riderId, coords });
+    socket.emit("updateLocation", { riderId, lat, lng });
 };
 
 export const disconnectRiderSocket = () => {
