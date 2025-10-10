@@ -34,8 +34,10 @@ export const connectRiderSocket = (riderId) => {
     console.log("❌ Rider disconnected from socket");
   });
 
-  socket.on("newOrder", (order) => {
-    emitter.emit("newOrder", order);
+  socket.on("orderAssigned", ({orderId,orderPayload}) => {
+    console.log(orderPayload);
+    
+    // emitter.emit("newOrder", orderPayload);
 });
 
 socket.on("orderUpdate", (order) => {
