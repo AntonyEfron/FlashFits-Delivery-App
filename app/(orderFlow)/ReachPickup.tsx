@@ -17,7 +17,7 @@ const ReachPickup: React.FC<ReachPickupProps> = ({ onNext }) => {
     <View style={styles.root}>
       <FakeMap />
       <View style={styles.sheet}>
-        <Text style={styles.locationLabel}>SELECT DELIVERY LOCATION</Text>
+        <Text style={styles.locationLabel}>SELECT PICKUP LOCATION</Text>
         <View style={styles.addressRow}>
           <View>
             <Text style={styles.addressTitle}>Rudrampeta</Text>
@@ -25,9 +25,6 @@ const ReachPickup: React.FC<ReachPickupProps> = ({ onNext }) => {
               Rudrampeta, Anantapur, Andhra Pradesh, India
             </Text>
           </View>
-          <TouchableOpacity>
-            <Text style={styles.changeText}>CHANGE</Text>
-          </TouchableOpacity>
         </View>
         <TouchableOpacity style={styles.button} onPress={onNext}>
           <Text style={styles.buttonText}>Reach Pickup Location</Text>

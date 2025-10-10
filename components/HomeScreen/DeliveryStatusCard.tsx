@@ -12,9 +12,9 @@ const { width } = Dimensions.get('window');
 const DeliveryStatusCard = ({ isOnline, onGoOnline }) => {
   const renderOfflineContent = () => (
     <View style={styles.contentContainer}>
-      <View style={styles.iconContainer}>
+      {/* <View style={styles.iconContainer}>
         <Text style={styles.offlineIcon}>📱</Text>
-      </View>
+      </View> */}
       <Text style={styles.title}>You're Offline</Text>
       <Text style={styles.subtitle}>
         Go online to start receiving delivery orders
@@ -31,9 +31,6 @@ const DeliveryStatusCard = ({ isOnline, onGoOnline }) => {
 
   const renderOnlineContent = () => (
     <View style={styles.contentContainer}>
-      <View style={styles.iconContainer}>
-        <Text style={styles.onlineIcon}>🔍</Text>
-      </View>
       <Text style={styles.title}>Looking for Orders</Text>
       <Text style={styles.subtitle}>
         Assigning order soon. Stay nearby for quick pickup!

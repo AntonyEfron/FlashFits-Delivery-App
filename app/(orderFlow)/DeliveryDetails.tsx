@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from 'react';
-import { View, Text, TouchableOpacity, ScrollView, StyleSheet, Alert } from 'react-native';
+import React, { useState, useEffect, useRef } from 'react';
+import { View, Text, TouchableOpacity, ScrollView, StyleSheet, Alert, Animated } from 'react-native';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { AnimatedDots } from '../../components/OrderFlowComponents/AnimatedDots';
 
@@ -15,9 +15,91 @@ const MOCK_ORDER = {
   ],
   totalAmount: 2697,
   tryDuration: 600, // seconds (10 minutes)
+  baseEarnings: 5, // ₹5 initial
+  earningsAfter10Min: 1, // ₹1 per minute after 10 minutes
 };
 
 type DeliveryStatus = 'pending' | 'trying';
+
+// Animated Earnings Circle Component
+const AnimatedEarningsCircle = ({ earnings }: { earnings: number }) => {
+  const scaleAnim = useRef(new Animated.Value(1)).current;
+  const pulseAnim = useRef(new Animated.Value(1)).current;
+
+  useEffect(() => {
+    // Main scale animation
+    const scaleAnimation = Animated.loop(
+      Animated.sequence([
+        Animated.timing(scaleAnim, {
+          toValue: 1.15,
+          duration: 1000,
+          useNativeDriver: true,
+        }),
+        Animated.timing(scaleAnim, {
+          toValue: 1,
+          duration: 1000,
+          useNativeDriver: true,
+        }),
+      ])
+    );
+
+    // Pulse animation for the outer ring
+    const pulseAnimation = Animated.loop(
+      Animated.sequence([
+        Animated.timing(pulseAnim, {
+          toValue: 1.3,
+          duration: 1500,
+          useNativeDriver: true,
+        }),
+        Animated.timing(pulseAnim, {
+          toValue: 1,
+          duration: 1500,
+          useNativeDriver: true,
+        }),
+      ])
+    );
+
+    scaleAnimation.start();
+    pulseAnimation.start();
+
+    return () => {
+      scaleAnimation.stop();
+      pulseAnimation.stop();
+    };
+  }, []);
+
+  return (
+    <View style={styles.earningsCircleContainer}>
+      Outer pulse ring
+      <Animated.View
+        style={[
+          styles.pulseRing,
+          {
+            transform: [{ scale: pulseAnim }],
+            opacity: pulseAnim.interpolate({
+              inputRange: [1, 1.3],
+              outputRange: [0.4, 0],
+            }),
+          },
+        ]}
+      />
+      
+      {/* Main earnings circle */}
+      <Animated.View
+        style={[
+          styles.earningsCircle,
+          {
+            transform: [{ scale: scaleAnim }],
+          },
+        ]}
+      >
+        <MaterialCommunityIcons name="currency-inr" size={20} color="#fff" />
+        <Text style={styles.earningsCircleAmount}>{earnings}</Text>
+        <Text style={styles.earningsCircleLabel}>Earned</Text>
+      </Animated.View>
+    </View>
+  );
+};
 
 const DeliveryDetails = ({
   onNext,
@@ -26,10 +108,15 @@ const DeliveryDetails = ({
 }) => {
   const [status, setStatus] = useState<DeliveryStatus>('pending');
   const [timeElapsed, setTimeElapsed] = useState(0);
+  const [earnings, setEarnings] = useState(0);
 
   /** Timer effect for Try & Buy */
   useEffect(() => {
     if (status !== 'trying') return;
+    
+    // Set initial earnings immediately
+    setEarnings(MOCK_ORDER.baseEarnings);
+    
     const timer = setInterval(() => {
       setTimeElapsed((prev) => {
         if (prev + 1 >= MOCK_ORDER.tryDuration) {
@@ -42,6 +129,21 @@ const DeliveryDetails = ({
     }, 1000);
     return () => clearInterval(timer);
   }, [status]);
+
+  /** Calculate earnings based on time elapsed */
+  useEffect(() => {
+    if (status === 'trying') {
+      const minutes = Math.floor(timeElapsed / 60);
+      let calculatedEarnings = MOCK_ORDER.baseEarnings;
+      
+      // After 10 minutes, add ₹1 per minute
+      if (minutes > 10) {
+        calculatedEarnings += (minutes - 10) * MOCK_ORDER.earningsAfter10Min;
+      }
+      
+      setEarnings(calculatedEarnings);
+    }
+  }, [timeElapsed, status]);
 
   const handleTryPeriodEnd = () => {
     Alert.alert('Customer Decision', 'Did the customer buy all the clothes?', [
@@ -64,7 +166,7 @@ const DeliveryDetails = ({
   /** PENDING STATE */
   if (status === 'pending') {
     return (
-      <ScrollView style={styles.containerBlue} contentContainerStyle={styles.scrollContent}>
+      <ScrollView style={styles.containerBlue}>
         <View style={styles.card}>
           <View style={styles.header}>
             <Text style={styles.headerTitle}>Deliver Order</Text>
@@ -93,10 +195,13 @@ const DeliveryDetails = ({
             <ActionButton color="#22c55e" icon="call" text="Call Customer" onPress={handleCall} />
             <ActionButton color="#3b82f6" icon="map" text="Open Map" onPress={handleMap} />
           </View>
-
+   
           <TouchableOpacity style={styles.primaryButton} onPress={handleHandover}>
             <MaterialCommunityIcons name="package-variant" size={22} color="#fff" />
-            <Text style={styles.primaryButtonText}>Handover Package (Start Try Period)</Text>
+            <View style={styles.textContainer}>
+              <Text style={styles.primaryButtonText}>Handover Package (Start Try Period)</Text>
+              <Text style={styles.primaryButtonText1}>Earn while you wait</Text>
+            </View>
           </TouchableOpacity>
         </View>
       </ScrollView>
@@ -118,12 +223,24 @@ const DeliveryDetails = ({
             <Text style={styles.subtitle}>Customer is trying the products</Text>
           </View>
 
+          {/* Timer Card with Enhanced Design */}
           <View style={styles.timerCard}>
-            <Text style={styles.timerLabel}>Elapsed Time</Text>
+            {/* Earnings Circle - Top Right */}
+            <View style={styles.earningsCircleSmallContainer}>
+              <AnimatedEarningsCircle earnings={earnings} />
+            </View>
+
+            <View style={styles.timerIconRow}>
+              <Ionicons name="hourglass-outline" size={24} color="#fff" />
+              <Text style={styles.timerLabel}>Time Elapsed</Text>
+            </View>
             <Text style={styles.timerValue}>{formatTime(timeElapsed)}</Text>
             <View style={styles.progressBarBg}>
               <View style={[styles.progressBar, { width: `${progress}%` }]} />
             </View>
+            <Text style={styles.timerSubtext}>
+              {Math.floor(MOCK_ORDER.tryDuration / 60 - timeElapsed / 60)} minutes remaining
+            </Text>
           </View>
 
           <View style={styles.itemsBeingTriedCard}>
@@ -187,24 +304,11 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#fef3c7',
   },
-  containerPurple: {
-    flex: 1,
-    backgroundColor: '#fae8ff',
+  scrollContent: {
+    paddingBottom: 24,
   },
-  containerRed: {
-    flex: 1,
-    backgroundColor: '#fee2e2',
-  },
-  containerGreen: {
-    flex: 1,
-    backgroundColor: '#d1fae5',
-  },
-  // scrollContent: {
-  //   padding: 24,
-  // },
   card: {
     backgroundColor: 'white',
-    // borderRadius: 16,
     padding: 32,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 4 },
@@ -259,13 +363,6 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: '#1f2937',
   },
-  infoText: {
-    fontSize: 16,
-    color: '#374151',
-  },
-  itemsList: {
-    marginTop: 8,
-  },
   itemRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
@@ -281,49 +378,11 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: '#1f2937',
   },
-  totalCard: {
-    backgroundColor: '#eef2ff',
-    padding: 16,
-    borderRadius: 12,
-    borderWidth: 2,
-    borderColor: '#c7d2fe',
-  },
-  totalLabel: {
-    fontSize: 12,
-    color: '#4f46e5',
-    marginBottom: 4,
-  },
-  totalAmount: {
-    fontSize: 32,
-    fontWeight: 'bold',
-    color: '#4338ca',
-  },
   buttonRow: {
     flexDirection: 'row',
-    gap: 16,
-    marginBottom: 24,
-  },
-  buttonGreen: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: '#22c55e',
-    paddingVertical: 12,
-    paddingHorizontal: 24,
-    borderRadius: 12,
-    gap: 8,
-  },
-  buttonBlue: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: '#3b82f6',
-    paddingVertical: 12,
-    paddingHorizontal: 24,
-    borderRadius: 12,
-    gap: 8,
+    justifyContent: 'space-between',
+    marginBottom: 70,
+    gap: 12,
   },
   buttonText: {
     color: 'white',
@@ -340,11 +399,23 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     gap: 8,
   },
-  // primaryButtonText: {
-  //   color: 'white',
-  //   fontSize: 16,
-  //   fontWeight: 'bold',
-  // },
+  textContainer: {
+    alignItems: 'center',
+  },
+  actionButton: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 14,
+    borderRadius: 14,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.15,
+    shadowRadius: 6,
+    elevation: 5,
+    gap: 10,
+  },
   centerContent: {
     alignItems: 'center',
     marginBottom: 32,
@@ -358,7 +429,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     marginBottom: 16,
   },
-    buttonGreenLarge: {
+  buttonGreenLarge: {
     backgroundColor: '#16a34a',
     paddingVertical: 16,
     paddingHorizontal: 24,
@@ -366,64 +437,111 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   primaryButtonText: {
-    // your existing text styles
     color: '#fff',
     fontSize: 16,
     fontWeight: '600',
   },
-  dot: {
+  primaryButtonText1: {
     color: '#fff',
-    fontSize: 20,
-    marginHorizontal: 2,
+    fontSize: 10,
+    fontWeight: '600',
   },
-  iconCircleRed: {
-    width: 96,
-    height: 96,
-    borderRadius: 48,
-    backgroundColor: '#fee2e2',
+  // Earnings Circle Styles
+  earningsCircleContainer: {
     alignItems: 'center',
     justifyContent: 'center',
-    marginBottom: 16,
+    position: 'relative',
   },
-  iconCircleGreen: {
-    width: 96,
-    height: 96,
-    borderRadius: 48,
-    backgroundColor: '#d1fae5',
+  pulseRing: {
+    position: 'absolute',
+    width: 90,
+    height: 90,
+    borderRadius: 45,
+    backgroundColor: '#16a34a',
+  },
+  earningsCircle: {
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+    backgroundColor: '#16a34a',
     alignItems: 'center',
     justifyContent: 'center',
-    marginBottom: 16,
+    shadowColor: '#16a34a',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.4,
+    shadowRadius: 8,
+    elevation: 6,
+    borderWidth: 3,
+    borderColor: '#fff',
   },
+  earningsCircleAmount: {
+    fontSize: 22,
+    fontWeight: 'bold',
+    color: '#fff',
+  },
+  earningsCircleLabel: {
+    fontSize: 9,
+    color: '#fff',
+    opacity: 0.9,
+    fontWeight: '600',
+  },
+  earningsCircleSmallContainer: {
+    position: 'absolute',
+    top: -40,
+    right: -30,
+    zIndex: 10,
+  },
+  // Enhanced Timer Card
   timerCard: {
     backgroundColor: '#f59e0b',
     borderRadius: 16,
-    padding: 32,
+    padding: 28,
     marginBottom: 32,
     alignItems: 'center',
+    shadowColor: '#f59e0b',
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.3,
+    shadowRadius: 12,
+    elevation: 8,
+    position: 'relative',
+    overflow: 'visible',
+  },
+  timerIconRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginBottom: 12,
   },
   timerLabel: {
     color: 'white',
-    fontSize: 12,
-    marginBottom: 8,
-    opacity: 0.9,
+    fontSize: 14,
+    fontWeight: '600',
+    opacity: 0.95,
   },
   timerValue: {
     color: 'white',
-    fontSize: 64,
+    fontSize: 56,
     fontWeight: 'bold',
     marginBottom: 16,
+    letterSpacing: 2,
+  },
+  timerSubtext: {
+    color: 'white',
+    fontSize: 12,
+    opacity: 0.85,
+    marginTop: 12,
   },
   progressBarBg: {
     width: '100%',
-    height: 12,
-    backgroundColor: 'rgba(255,255,255,0.3)',
-    borderRadius: 6,
+    height: 8,
+    backgroundColor: 'rgba(255,255,255,0.25)',
+    borderRadius: 4,
     overflow: 'hidden',
   },
   progressBar: {
     height: '100%',
     backgroundColor: 'white',
-    borderRadius: 6,
+    borderRadius: 4,
   },
   itemsBeingTriedCard: {
     backgroundColor: '#eff6ff',
@@ -444,16 +562,6 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: '#1e3a8a',
   },
-  cardHeaderTextRed: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#7f1d1d',
-  },
-  cardHeaderTextGreen: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#14532d',
-  },
   itemRowSmall: {
     flexDirection: 'row',
     justifyContent: 'space-between',
@@ -468,225 +576,6 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '600',
     color: '#1f2937',
-  },
-  buttonGreenLarge: {
-    backgroundColor: '#16a34a',
-    paddingVertical: 16,
-    paddingHorizontal: 24,
-    borderRadius: 12,
-    alignItems: 'center',
-  },
-  selectableItem: {
-    padding: 24,
-    borderRadius: 12,
-    borderWidth: 2,
-    borderColor: '#e5e7eb',
-    backgroundColor: 'white',
-    marginBottom: 16,
-  },
-  selectedItem: {
-    borderColor: '#22c55e',
-    backgroundColor: '#f0fdf4',
-  },
-  itemContent: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-  itemLeft: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 16,
-    flex: 1,
-  },
-  itemEmoji: {
-    fontSize: 36,
-  },
-  itemName: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: '#1f2937',
-  },
-  itemPriceLarge: {
-    fontSize: 20,
-    fontWeight: 'bold',
-    color: '#111827',
-    marginTop: 4,
-  },
-  uncheckedCircle: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    borderWidth: 2,
-    borderColor: '#d1d5db',
-  },
-  summaryCard: {
-    backgroundColor: '#a855f7',
-    borderRadius: 12,
-    padding: 24,
-    marginBottom: 24,
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-  summaryLabel: {
-    color: 'white',
-    fontSize: 12,
-    opacity: 0.9,
-    marginBottom: 4,
-  },
-  summaryAmount: {
-    color: 'white',
-    fontSize: 36,
-    fontWeight: 'bold',
-  },
-  summarySubtext: {
-    color: 'white',
-    fontSize: 12,
-    opacity: 0.9,
-    marginTop: 8,
-  },
-  primaryButtonPurple: {
-    backgroundColor: '#a855f7',
-    paddingVertical: 16,
-    paddingHorizontal: 24,
-    borderRadius: 12,
-    alignItems: 'center',
-  },
-  disabledButton: {
-    backgroundColor: '#d1d5db',
-  },
-  disabledButtonText: {
-    color: '#6b7280',
-  },
-  returnCard: {
-    backgroundColor: '#fef2f2',
-    borderWidth: 2,
-    borderColor: '#fecaca',
-    borderRadius: 12,
-    padding: 24,
-    marginBottom: 32,
-  },
-  returnItemsList: {
-    marginTop: 16,
-  },
-  returnItemCard: {
-    backgroundColor: 'white',
-    padding: 16,
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: '#fecaca',
-    marginBottom: 12,
-  },
-  returnItemContent: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-  },
-  returnItemEmoji: {
-    fontSize: 32,
-  },
-  returnItemName: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#1f2937',
-  },
-  returnItemPrice: {
-    fontSize: 14,
-    color: '#6b7280',
-  },
-  purchasedCard: {
-    backgroundColor: '#f0fdf4',
-    borderWidth: 2,
-    borderColor: '#bbf7d0',
-    borderRadius: 12,
-    padding: 24,
-    marginBottom: 32,
-  },
-  totalDivider: {
-    height: 2,
-    backgroundColor: '#86efac',
-    marginVertical: 12,
-  },
-  totalRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-  totalRowLabel: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: '#14532d',
-  },
-  totalRowAmount: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: '#15803d',
-  },
-  earningsCard: {
-    backgroundColor: '#16a34a',
-    borderRadius: 16,
-    padding: 32,
-    marginBottom: 32,
-    alignItems: 'center',
-  },
-  earningsLabel: {
-    color: 'white',
-    fontSize: 12,
-    marginBottom: 8,
-    opacity: 0.9,
-  },
-  earningsAmount: {
-    color: 'white',
-    fontSize: 56,
-    fontWeight: 'bold',
-    marginBottom: 8,
-  },
-  earningsSubtext: {
-    color: 'white',
-    fontSize: 12,
-    opacity: 0.75,
-  },
-  summaryRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginTop: 4,
-  },
-  summaryRowLabel: {
-    fontSize: 16,
-    color: '#374151',
-  },
-  summaryRowValue: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#1f2937',
-  },
-  paymentSummaryCard: {
-    backgroundColor: '#f0fdf4',
-    padding: 16,
-    borderRadius: 12,
-    borderWidth: 2,
-    borderColor: '#bbf7d0',
-  },
-  paymentLabel: {
-    fontSize: 12,
-    color: '#15803d',
-    marginBottom: 8,
-  },
-  paymentRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-  paymentRowLabel: {
-    fontSize: 16,
-    color: '#374151',
-  },
-  paymentAmount: {
-    fontSize: 20,
-    fontWeight: 'bold',
-    color: '#15803d',
   },
 });
 

@@ -18,13 +18,13 @@ export default function Index() {
         const token = await SecureStore.getItemAsync("token");
         
         // const verifiedStatus = await SecureStore.getItemAsync("isVerified");
-        const verifiedStatus = "true";
+        const verifiedStatus = false ;
         console.log(token , verifiedStatus);
         
 
         if (!token) {
           setRedirectPath("/(auth)");
-        } else if (verifiedStatus === "false") {
+        } else if (verifiedStatus === false) {
           console.log("herer   ss");
           
           setRedirectPath("/(register)");
@@ -62,5 +62,5 @@ export default function Index() {
     );
   }
 
-  return <Redirect href={redirectPath} />;
+  return <Redirect href={'/(home)'} />;
 }

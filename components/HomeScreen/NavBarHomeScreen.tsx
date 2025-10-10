@@ -31,10 +31,9 @@ const DeliveryNavbar = ({ isOnline = false, onToggleOnline }) => {
     Alert.alert('Help', 'Help center will be opened here');
   };
 
-  const handleProfile = () => {
-    router.replace('/(profile)')
-    // Alert.alert('Profile', 'Profile screen will be opened here');
-  };
+const handleProfile = () => {
+  router.push('/(profile)');
+};
 
   return (
     <View style={styles.navbar}>
@@ -105,7 +104,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#6b7280',
     paddingHorizontal: 20,
     paddingVertical: 12,
-    paddingTop: 50,
+    // paddingTop: 50,
   },
   leftSection: {
     flex: 1,

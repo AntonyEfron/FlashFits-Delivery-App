@@ -191,13 +191,13 @@ const verifyOTP = async (otpCode: string) => {
     setIsLoading(true);
 
     const res = await verifyPhoneOtp(phoneNumber, otpCode);
-    console.log("✅ OTP verification success:", res.data);
+    // console.log("✅ OTP verification success:", res.data);
 
     const { status, data } = res;
-    console.log(status, "status");
+    // console.log(status, "status");
     
     const rider = data?.deliveryRider;
-    console.log(rider, "rider");
+    // console.log(rider, "rider");
     
 
       if (status === 201 || status === 200) {
@@ -214,7 +214,11 @@ const verifyOTP = async (otpCode: string) => {
           rider?.isVerified ? "Welcome back!" : "Please complete registration."
         );
         // Always redirect to index, let index.tsx decide
-        router.replace("/");
+          if (rider?.isVerified) {
+            router.replace("/(home)");
+          } else {
+            router.replace("/(register)");
+          }
       }
   } catch (error: any) {
     console.error("❌ OTP verification failed:", error);
