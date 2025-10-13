@@ -49,6 +49,8 @@ export default function HomeScreen() {
         console.log("workinggg");
         
         connectRiderSocket(riderId);
+        console.log("socket connected");
+        
         startLocationTracking(riderId); // starts background location tracking
       }
     } else {

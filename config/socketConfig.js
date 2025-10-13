@@ -1,5 +1,6 @@
 // src/config/riderSocket.ts
 import io from "socket.io-client/dist/socket.io";
+// import {io} from "socket.io-client";
 
 import mitt from "mitt";
 import Constants from "expo-constants";
@@ -27,6 +28,7 @@ export const connectRiderSocket = (riderId) => {
   socket.on("connect", () => {
     console.log("✅ Rider connected to socket:", socket?.id);
     socket?.emit("registerRider", { riderId }); // match backend
+    
 // Backend can track online riders
   });
 
@@ -73,3 +75,5 @@ export const disconnectRiderSocket = () => {
     socket = null;
   }
 };
+
+export const getSocket = () => socket;

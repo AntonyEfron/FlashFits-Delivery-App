@@ -1,4 +1,6 @@
 import React from 'react';
+import { getSocket } from '../../config/socketConfig';
+
 import {
   View,
   Text,
@@ -29,8 +31,19 @@ const ProfilePage = () => {
         style: 'destructive',
         onPress: async () => {
           try {
+            // 1️⃣ Disconnect socket if active
+            const socket = getSocket();
+            if (socket && socket.connected) {
+              // socket.emit('riderOffline'); // optional: tell server rider went offline
+              socket.disconnect();
+              console.log('Socket disconnected successfully');
+            }
+  
+            // 2️⃣ Clear storage
             await SecureStore.deleteItemAsync('token');
             await SecureStore.deleteItemAsync('deliveryRiderId');
+  
+            // 3️⃣ Navigate
             console.log('User logged out and token deleted');
             router.replace('/(auth)');
           } catch (error) {
