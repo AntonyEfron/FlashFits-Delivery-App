@@ -4,7 +4,7 @@ import NavBarHomeScreen from '@/components/HomeScreen/NavBarHomeScreen';
 import DeliveryStatusCard from '@/components/HomeScreen/DeliveryStatusCard';
 import DailyProgressCard from '@/components/HomeScreen/DailyProgressCard';
 import { connectRiderSocket, disconnectRiderSocket } from '../../config/socketConfig';
-import startLocationTracking from '@/utils/updateLocation';
+import {startLocationTracking,stopLocationTracking} from '@/utils/updateLocation';
 import * as SecureStore from 'expo-secure-store';
 import * as Location from 'expo-location';
 import { Alert, Linking } from 'react-native';
@@ -26,7 +26,6 @@ export default function HomeScreen() {
     setIsOnline(status);
 
     if (status) {
-      // Ensure GPS is ON before tracking
       const { status: permStatus } = await Location.requestForegroundPermissionsAsync();
       if (permStatus !== "granted") {
         Alert.alert("Permission denied", "You must allow location access to go online.");
@@ -36,31 +35,24 @@ export default function HomeScreen() {
 
       const servicesEnabled = await Location.hasServicesEnabledAsync();
       if (!servicesEnabled) {
-        Alert.alert(
-          "Location Services Off",
-          "Please turn on GPS to continue using the app.",
-          [{ text: "Open Settings", onPress: () => Linking.openSettings() }]
-        );
+        Alert.alert("Location Services Off", "Please turn on GPS to continue using the app.", [
+          { text: "Open Settings", onPress: () => Linking.openSettings() },
+        ]);
         setIsOnline(false);
         return;
       }
 
       if (riderId) {
-        console.log("workinggg");
-        
         connectRiderSocket(riderId);
-        console.log("socket connected");
-        
-        startLocationTracking(riderId); // starts background location tracking
+        startLocationTracking(riderId);
       }
     } else {
       disconnectRiderSocket();
+      await stopLocationTracking();
     }
   };
 
-  const handleGoOnline = () => {
-    setIsOnline(true);
-  };
+  const handleGoOnline = () => setIsOnline(true);
 
   return (
     <>

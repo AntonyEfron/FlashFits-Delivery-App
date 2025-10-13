@@ -3,7 +3,7 @@ export default ({ config }) => {
     return {
       ...config,
       extra: {
-        BACKEND_URL: "https://47270b34f35c.ngrok-free.app", // change to your backend URL
+        BACKEND_URL: "https://55a299101e7c.ngrok-free.app", // change to your backend URL
       },
     };
   };

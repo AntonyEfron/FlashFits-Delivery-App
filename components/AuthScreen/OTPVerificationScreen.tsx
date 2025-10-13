@@ -18,7 +18,7 @@ import { router } from "expo-router";
 import { LinearGradient } from 'expo-linear-gradient';
 import {verifyPhoneOtp} from '../../app/api/auth'
 import * as SecureStore from "expo-secure-store";
-import { connectRiderSocket } from '../../config/socketConfig';
+// import { connectRiderSocket } from '../../config/socketConfig';
 
 const { width, height } = Dimensions.get('window');
 
