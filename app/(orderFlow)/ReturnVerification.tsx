@@ -8,7 +8,8 @@ import {
   TextInput,
   Alert,
   ScrollView,
-  SafeAreaView,
+  KeyboardAvoidingView,
+  Platform,
 } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
 import { MaterialCommunityIcons, Ionicons } from '@expo/vector-icons';
@@ -38,25 +39,6 @@ const ReturnVerification: React.FC<ReturnVerificationProps> = ({ onNext }) => {
     }
   };
 
-  // const pickImage = async () => {
-  //   const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
-  //   if (status !== 'granted') {
-  //     Alert.alert('Permission Denied', 'Please allow photo access to upload proof.');
-  //     return;
-  //   }
-
-  //   const result = await ImagePicker.launchImageLibraryAsync({
-  //     mediaTypes: ImagePicker.MediaTypeOptions.Images,
-  //     allowsEditing: true,
-  //     aspect: [4, 3],
-  //     quality: 0.8,
-  //   });
-
-  //   if (!result.canceled) {
-  //     setImage(result.assets[0].uri);
-  //   }
-  // };
-
   const handleSubmit = () => {
     if (!image) {
       Alert.alert('Upload Required', 'Please upload or take a return proof photo.');
@@ -73,8 +55,16 @@ const ReturnVerification: React.FC<ReturnVerificationProps> = ({ onNext }) => {
   };
 
   return (
-    // <SafeAreaView style={styles.screen}>
-      <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
+    <KeyboardAvoidingView 
+      style={styles.container}
+      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+      keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 20}
+    >
+      <ScrollView 
+        contentContainerStyle={styles.scrollContent} 
+        showsVerticalScrollIndicator={false}
+        keyboardShouldPersistTaps="handled"
+      >
         {/* Header */}
         <View style={styles.header}>
           <MaterialCommunityIcons name="package-variant-closed" size={60} color="#1e3a8a" />
@@ -101,11 +91,6 @@ const ReturnVerification: React.FC<ReturnVerificationProps> = ({ onNext }) => {
                 <Ionicons name="camera-outline" size={50} color="#9ca3af" />
                 <Text style={styles.uploadText}>Take Photo Using Camera</Text>
               </TouchableOpacity>
-
-              {/* <TouchableOpacity style={[styles.uploadBox, { marginTop: 12 }]} onPress={pickImage}>
-                <Ionicons name="image-outline" size={50} color="#9ca3af" />
-                <Text style={styles.uploadText}>Select from Gallery</Text>
-              </TouchableOpacity> */}
             </View>
           )}
         </View>
@@ -130,20 +115,21 @@ const ReturnVerification: React.FC<ReturnVerificationProps> = ({ onNext }) => {
           <Ionicons name="checkmark-done" size={22} color="#fff" />
         </TouchableOpacity>
       </ScrollView>
-    // </SafeAreaView>
+    </KeyboardAvoidingView>
   );
 };
 
 export default ReturnVerification;
 
 const styles = StyleSheet.create({
-  screen: {
+  container: {
     flex: 1,
     backgroundColor: '#f0f6ff',
   },
   scrollContent: {
+    flexGrow: 1,
     padding: 20,
-    paddingBottom: 60,
+    paddingBottom: 40,
   },
   header: {
     alignItems: 'center',

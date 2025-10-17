@@ -15,7 +15,7 @@ const MOCK_ORDER = {
   ],
   totalAmount: 2697,
   tryDuration: 600, // seconds (10 minutes)
-  baseEarnings: 5, // ₹5 initial
+  baseEarnings: 8, // ₹5 initial
   earningsAfter10Min: 1, // ₹1 per minute after 10 minutes
 };
 
@@ -70,7 +70,6 @@ const AnimatedEarningsCircle = ({ earnings }: { earnings: number }) => {
 
   return (
     <View style={styles.earningsCircleContainer}>
-      Outer pulse ring
       <Animated.View
         style={[
           styles.pulseRing,
@@ -84,7 +83,6 @@ const AnimatedEarningsCircle = ({ earnings }: { earnings: number }) => {
         ]}
       />
       
-      {/* Main earnings circle */}
       <Animated.View
         style={[
           styles.earningsCircle,
@@ -110,11 +108,9 @@ const DeliveryDetails = ({
   const [timeElapsed, setTimeElapsed] = useState(0);
   const [earnings, setEarnings] = useState(0);
 
-  /** Timer effect for Try & Buy */
   useEffect(() => {
     if (status !== 'trying') return;
     
-    // Set initial earnings immediately
     setEarnings(MOCK_ORDER.baseEarnings);
     
     const timer = setInterval(() => {
@@ -130,20 +126,19 @@ const DeliveryDetails = ({
     return () => clearInterval(timer);
   }, [status]);
 
-  /** Calculate earnings based on time elapsed */
-  useEffect(() => {
-    if (status === 'trying') {
-      const minutes = Math.floor(timeElapsed / 60);
-      let calculatedEarnings = MOCK_ORDER.baseEarnings;
-      
-      // After 10 minutes, add ₹1 per minute
-      if (minutes > 10) {
-        calculatedEarnings += (minutes - 10) * MOCK_ORDER.earningsAfter10Min;
-      }
-      
-      setEarnings(calculatedEarnings);
+useEffect(() => {
+  if (status === 'trying') {
+    const minutes = Math.floor(timeElapsed / 60);
+    let calculatedEarnings = MOCK_ORDER.baseEarnings;
+
+    if (minutes >= 10) {
+      const extraMinutes = minutes - 9; // start counting from 10th minute
+      calculatedEarnings += extraMinutes * MOCK_ORDER.earningsAfter10Min;
     }
-  }, [timeElapsed, status]);
+
+    setEarnings(calculatedEarnings);
+  }
+}, [timeElapsed, status]);
 
   const handleTryPeriodEnd = () => {
     Alert.alert('Customer Decision', 'Did the customer buy all the clothes?', [
@@ -223,9 +218,7 @@ const DeliveryDetails = ({
             <Text style={styles.subtitle}>Customer is trying the products</Text>
           </View>
 
-          {/* Timer Card with Enhanced Design */}
           <View style={styles.timerCard}>
-            {/* Earnings Circle - Top Right */}
             <View style={styles.earningsCircleSmallContainer}>
               <AnimatedEarningsCircle earnings={earnings} />
             </View>
@@ -241,6 +234,9 @@ const DeliveryDetails = ({
             <Text style={styles.timerSubtext}>
               {Math.floor(MOCK_ORDER.tryDuration / 60 - timeElapsed / 60)} minutes remaining
             </Text>
+          <Text style={styles.timerSubtext}>
+            Earn <MaterialCommunityIcons name="currency-inr" size={10} color="#fff" />1 for every minute after 10 minutes
+          </Text>
           </View>
 
           <View style={styles.itemsBeingTriedCard}>
@@ -270,7 +266,6 @@ const DeliveryDetails = ({
   return null;
 };
 
-/** Reusable Small Components */
 const Info = ({ label, value }: { label: string; value: string }) => (
   <View style={styles.infoCard}>
     <Text style={styles.infoLabel}>{label}</Text>
@@ -487,8 +482,8 @@ const styles = StyleSheet.create({
   },
   earningsCircleSmallContainer: {
     position: 'absolute',
-    top: -40,
-    right: -30,
+    top: -20,
+    right: -10,
     zIndex: 10,
   },
   // Enhanced Timer Card

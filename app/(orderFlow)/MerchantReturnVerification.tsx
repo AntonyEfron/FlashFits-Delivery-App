@@ -23,14 +23,13 @@ const MerchantReturnVerification: React.FC<MerchantReturnVerificationProps> = ({
     returnId: 'RET-2024-056',
   };
 
-  const handleHandover = () => {
-    setVerifying(true);
-    // simulate merchant verification (3 seconds)
-    setTimeout(() => {
-      setVerifying(false);
-      setTimeout(onNext, 1000);
-    }, 3000);
-  };
+const handleHandover = () => {
+  setVerifying(true);
+  setTimeout(() => {
+    // Optionally: small delay for smoothness
+    setTimeout(onNext, 200);
+  }, 3000);
+};
 
   return (
     <ScrollView contentContainerStyle={styles.container}>
