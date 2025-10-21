@@ -11,6 +11,10 @@ import { Alert, Linking } from 'react-native';
 
 export default function HomeScreen() {
   const [riderId, setRiderId] = useState(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const [redirectPath, setRedirectPath] = useState<
+    "/(home)" | "/(auth)" | "/(register)"
+  >("/(auth)");
   useEffect(() => {
     const fetchRiderId = async () => {
       const id = await SecureStore.getItemAsync("deliveryRiderId");
@@ -21,6 +25,34 @@ export default function HomeScreen() {
     fetchRiderId();
   }, []);
   const [isOnline, setIsOnline] = useState(false);
+
+  useEffect(() => {
+    const checkAuth = async () => {
+      try {
+        const token = await SecureStore.getItemAsync("token");
+        const verifiedStatus = await SecureStore.getItemAsync("isVerified");
+        console.log(token , verifiedStatus);
+        if (!token) {
+          setRedirectPath("/(auth)");
+        } else if (verifiedStatus === false) {
+          console.log("herer   ss"  , verifiedStatus);
+          
+          setRedirectPath("/(register)");
+        } else {
+          setRedirectPath("/(home)");
+        }
+      } catch (error) {
+        console.error("Error checking auth:", error);
+        setRedirectPath("/(auth)");
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    checkAuth();
+  }, []);
+
+  
 
   const handleToggleOnline = async (status) => {
     setIsOnline(status);
