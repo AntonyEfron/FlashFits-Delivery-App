@@ -5,7 +5,6 @@ import Constants from "expo-constants";
 
 let socket = null;
 export const emitter = mitt();
-
 export const connectRiderSocket = (riderId) => {
   if (socket && socket.connected) {
     console.log("⚠️ Rider socket already connected:", socket.id);
@@ -29,7 +28,8 @@ export const connectRiderSocket = (riderId) => {
 
   socket.on("orderAssigned", ({ orderId, orderPayload }) => {
     console.log("📦 Order assigned:", orderPayload);
-    emitter.emit("newOrder", orderPayload);
+    emitter.emit("orderAssigned", orderPayload);
+    // router.push("/(orderFlow)");
   });
 
   socket.on("orderUpdate", (order) => {

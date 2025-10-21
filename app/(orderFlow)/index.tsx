@@ -11,6 +11,7 @@ import MerchantReturnVerification from './MerchantReturnVerification';
 import { useRouter } from 'expo-router';
 
 const OrderFlow: React.FC = () => {
+  console.log("order flow");
   const [step, setStep] = useState<number>(0);
   const router = useRouter();
 
