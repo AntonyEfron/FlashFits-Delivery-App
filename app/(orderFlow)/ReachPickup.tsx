@@ -1,18 +1,91 @@
-import React from 'react';
-import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
-
-// Demo: this can be a real MapView, add map integrations as needed
-const FakeMap = () => (
-  <View style={styles.mapContainer}>
-    {/* Simulate map with a blueish color */}
-  </View>
-);
+import React, { useState } from "react";
+import { View, Text, TouchableOpacity, StyleSheet, Linking, Alert } from "react-native";
+import { ReachPickUpLocation } from "../api/orderFlow";
+import { getCurrentLocation } from "../../utils/updateLocation";
+import * as SecureStore from "expo-secure-store";
 
 interface ReachPickupProps {
   onNext: () => void;
 }
 
 const ReachPickup: React.FC<ReachPickupProps> = ({ onNext }) => {
+
+  const pickupCoords = { lat: 9.9675883, lng: 76.2994220 };
+
+  /** 🌍 Utility to calculate distance between two coordinates (Haversine formula) */
+  const getDistanceFromLatLonInMeters = (lat1: number, lon1: number, lat2: number, lon2: number) => {
+    const R = 6371000; // Earth radius in meters
+    const dLat = ((lat2 - lat1) * Math.PI) / 180;
+    const dLon = ((lon2 - lon1) * Math.PI) / 180;
+    const a =
+      Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+      Math.cos((lat1 * Math.PI) / 180) *
+        Math.cos((lat2 * Math.PI) / 180) *
+        Math.sin(dLon / 2) *
+        Math.sin(dLon / 2);
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+    return R * c;
+  };
+
+  /** ✅ Handle Reach Pickup button */
+  const handleReachPickup = async () => {
+    try {
+      const orderData = await SecureStore.getItemAsync("currentOrder");
+     if (!orderData) {
+      Alert.alert("Error", "No current order found.");
+      return;
+    }
+    const order = JSON.parse(orderData); // ✅ Convert string to object
+    const orderId = order.orderId;       // ✅ Extract orderId
+    console.log(orderId, "📦 orderId");
+     
+      const currentLoc = await getCurrentLocation();
+      if (!currentLoc) {
+        Alert.alert("Error", "Unable to fetch current location.");
+        return;
+      }
+
+      const distance = getDistanceFromLatLonInMeters(
+        currentLoc.latitude,
+        currentLoc.longitude,
+        pickupCoords.lat,
+        pickupCoords.lng
+      );
+
+      console.log("📏 Distance to pickup:", distance.toFixed(2), "meters");
+
+      if (distance > 100) {
+        Alert.alert("Too Far", `You are ${distance.toFixed(0)} meters away from pickup location.`);
+        return;
+      }
+
+      await ReachPickUpLocation({ orderId, coordinates: pickupCoords });
+      Alert.alert("Success", "Reached pickup location confirmed.");
+      onNext();
+    } catch (error) {
+      Alert.alert("Error", "Failed to send pickup log");
+      console.error("❌ Error in handleReachPickup:", error);
+    }
+  };
+
+  /** 🗺️ Open pickup location in Google Maps */
+  const openInGoogleMaps = () => {
+    const { lat, lng } = pickupCoords;
+    const url = `https://www.google.com/maps?q=${lat},${lng}`;
+    Linking.openURL(url).catch(() => {
+      Alert.alert("Error", "Unable to open Google Maps");
+    });
+  };
+
+  const FakeMap = () => (
+    <View style={styles.mapContainer}>
+      <Text style={styles.mapText}>Map Preview Disabled</Text>
+      <TouchableOpacity style={styles.mapButton} onPress={openInGoogleMaps}>
+        <Text style={styles.mapButtonText}>Open in Google Maps</Text>
+      </TouchableOpacity>
+    </View>
+  );
+
   return (
     <View style={styles.root}>
       <FakeMap />
@@ -26,7 +99,8 @@ const ReachPickup: React.FC<ReachPickupProps> = ({ onNext }) => {
             </Text>
           </View>
         </View>
-        <TouchableOpacity style={styles.button} onPress={onNext}>
+
+        <TouchableOpacity style={styles.button} onPress={handleReachPickup}>
           <Text style={styles.buttonText}>Reach Pickup Location</Text>
         </TouchableOpacity>
       </View>
@@ -35,76 +109,46 @@ const ReachPickup: React.FC<ReachPickupProps> = ({ onNext }) => {
 };
 
 const styles = StyleSheet.create({
-  root: { flex: 1, backgroundColor: '#f1f5f9' },
+  root: { flex: 1, backgroundColor: "#f1f5f9" },
   mapContainer: {
     flex: 1,
-    backgroundColor: '#dbeafe',
+    backgroundColor: "#dbeafe",
+    alignItems: "center",
+    justifyContent: "center",
   },
+  mapText: { color: "#6b7280", fontSize: 16, fontWeight: "600" },
+  mapButton: {
+    backgroundColor: "#3b82f6",
+    marginHorizontal: 24,
+    marginVertical: 17,
+    paddingVertical: 14,
+    borderRadius: 12,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  mapButtonText: { color: "#fff", fontWeight: "700", fontSize: 16 },
   sheet: {
-    position: 'absolute',
+    position: "absolute",
     bottom: 0,
-    left: 0, right: 0,
-    backgroundColor: '#fff',
+    left: 0,
+    right: 0,
+    backgroundColor: "#fff",
     borderTopLeftRadius: 22,
     borderTopRightRadius: 22,
     padding: 24,
     elevation: 16,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: -2 },
-    shadowOpacity: 0.12,
-    shadowRadius: 12,
   },
-  locationLabel: {
-    color: '#949494',
-    fontWeight: '600',
-    fontSize: 12,
-    letterSpacing: 1,
-    marginBottom: 10,
-  },
-  addressRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'flex-start',
-    marginBottom: 30,
-  },
-  addressTitle: {
-    color: '#111827',
-    fontFamily: 'System',
-    fontWeight: '700',
-    fontSize: 18,
-    marginBottom: 2,
-  },
-  addressDetails: {
-    color: '#555',
-    fontFamily: 'System',
-    fontSize: 14,
-    width: 240,
-  },
-  changeText: {
-    color: '#ee6e46',
-    fontWeight: '700',
-    fontSize: 14,
-    padding: 8,
-  },
+  locationLabel: { color: "#949494", fontWeight: "600", fontSize: 12, marginBottom: 10 },
+  addressRow: { flexDirection: "row", justifyContent: "space-between", marginBottom: 30 },
+  addressTitle: { color: "#111827", fontWeight: "700", fontSize: 18, marginBottom: 2 },
+  addressDetails: { color: "#555", fontSize: 14, width: 240 },
   button: {
-    backgroundColor: '#ff5035',
+    backgroundColor: "#ff5035",
     paddingVertical: 16,
     borderRadius: 12,
-    marginTop: 0,
-    width: '100%',
-    alignSelf: 'center',
-    shadowColor: '#ee6e46',
-    shadowOffset: { width: 0, height: 3 },
-    shadowOpacity: 0.2,
-    shadowRadius: 6,
+    width: "100%",
   },
-  buttonText: {
-    color: '#fff',
-    fontWeight: '700',
-    fontSize: 16,
-    textAlign: 'center',
-    letterSpacing: 0.5,
-  },
+  buttonText: { color: "#fff", fontWeight: "700", fontSize: 16, textAlign: "center" },
 });
 
 export default ReachPickup;

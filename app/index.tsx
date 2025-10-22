@@ -3,7 +3,6 @@ import { Redirect, router } from "expo-router";
 import * as SecureStore from "expo-secure-store";
 import { ActivityIndicator, View, Text } from "react-native";
 import { useLocationPermission } from "../hooks/useLocationPermission";
-import { emitter } from "../config/socketConfig";
 
 export default function Index() {
   const { hasPermission, locationEnabled } = useLocationPermission();
@@ -36,24 +35,26 @@ export default function Index() {
 
     checkAuth();
   }, []);
-  const [order, setOrder] = useState<any>(null);
 
-  // ✅ Listen for "orderAssigned" socket event
-  useEffect(() => {
-    const handleOrder = (payload: any) => {
-      console.log("📦 Received order on screen:", payload);
-      setOrder(payload);
+  
+  // const [order, setOrder] = useState<any>(null);
 
-      // Navigate to OrderFlow
-      router.push("/orderFlow"); // adjust route if needed
-    };
+  // // ✅ Listen for "orderAssigned" socket event
+  // useEffect(() => {
+  //   const handleOrder = (payload: any) => {
+  //     console.log("📦 Received order on screen:", payload);
+  //     setOrder(payload);
 
-    emitter.on("orderAssigned", handleOrder);
+  //     // Navigate to OrderFlow
+  //     router.push("/orderFlow"); // adjust route if needed
+  //   };
 
-    return () => {
-      emitter.off("orderAssigned", handleOrder);
-    };
-  }, []);
+  //   emitter.on("orderAssigned", handleOrder);
+
+  //   return () => {
+  //     emitter.off("orderAssigned", handleOrder);
+  //   };
+  // }, []);
 
   // ⏳ Show loading until permissions + auth resolved
   if (!hasPermission || !locationEnabled) {

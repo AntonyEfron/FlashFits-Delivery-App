@@ -33,6 +33,7 @@ export const connectRiderSocket = (riderId) => {
   });
 
   socket.on("orderUpdate", (order) => {
+    console.log('orderUpdated 📦📦📦📦📦' );
     emitter.emit("orderUpdate", order);
   });
 
@@ -61,3 +62,12 @@ export const disconnectRiderSocket = (riderId) => {
 };
 
 export const getSocket = () => socket;
+
+export const joinOrderRoom = (orderId: string) => {
+  if (socket && socket.connected) {
+    console.log("✅ Emitting joinOrderRoom event for order:", orderId);
+    socket.emit("joinOrderRoom", orderId);
+  } else {
+    console.error("❌ Cannot join order room: Socket not connected");
+  }
+};

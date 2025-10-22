@@ -28,12 +28,43 @@ export const startLocationTracking = async (riderId) => {
   console.log("✅ Location tracking started");
 };
 
-export const stopLocationTracking = async () => {
-  if (locationSubscription) {
-    await locationSubscription.remove();
-    locationSubscription = null;
-    console.log("🛑 Location tracking stopped");
-  } else {
-    console.log("⚠️ No active location watcher");
+export const ReachPickUpLocation = async ({ orderId, coordinates }) => {
+  try {
+    const response = await axiosInstance.post("/deliveryRider/order/reachPickupLocation", {
+      event: "REACH_PICKUP_LOCATION",
+      timestamp: new Date().toISOString(),
+      orderId,
+      coordinates,
+    });
+
+    console.log("📨 ReachPickup log sent successfully:", response.data);
+    return response.data;
+  } catch (error) {
+    console.error("❌ Error in ReachPickUpLocation:", error.response?.data || error.message);
+    throw error;
+  }
+};
+
+export const getCurrentLocation = async () => {
+  try {
+    // Ask for permission
+    const { status } = await Location.requestForegroundPermissionsAsync();
+    if (status !== "granted") {
+      console.warn("⚠️ Location permission not granted");
+      return null;
+    }
+
+    // Get current position
+    const location = await Location.getCurrentPositionAsync({
+      accuracy: Location.Accuracy.High,
+    });
+
+    const { latitude, longitude } = location.coords;
+    console.log("📍 Current location:", latitude, longitude);
+
+    return { latitude, longitude };
+  } catch (error) {
+    console.error("❌ Error fetching current location:", error.message);
+    return null;
   }
 };

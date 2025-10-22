@@ -1,5 +1,14 @@
-import React, { useState } from 'react';
-import { View, Text, TextInput, TouchableOpacity, StyleSheet, ScrollView } from 'react-native';
+import React, { useState } from "react";
+import {
+  View,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  StyleSheet,
+  ScrollView,
+  Alert,
+} from "react-native";
+import { VerifyPickupOtpApi } from "../api/orderFlow";
 
 interface OrderItem {
   id: string;
@@ -11,10 +20,12 @@ interface OrderItem {
 
 interface PickupDetailsProps {
   onNext: () => void;
+  orderId: string; // added to pass to API
 }
 
-const PickupDetails: React.FC<PickupDetailsProps> = ({ onNext }) => {
+const PickupDetails: React.FC<PickupDetailsProps> = ({ onNext, orderId }) => {
   const [code, setCode] = useState<string>("");
+  const [isVerifying, setIsVerifying] = useState<boolean>(false);
   const [itemsExpanded, setItemsExpanded] = useState<boolean>(true);
   const [notesExpanded, setNotesExpanded] = useState<boolean>(true);
 
@@ -29,18 +40,52 @@ const PickupDetails: React.FC<PickupDetailsProps> = ({ onNext }) => {
     Distance: "2.5 Km",
     specialInstructions: "Handle with care - contains fragile items",
     items: [
-      { id: "1", name: "Fresh Organic Tomatoes", quantity: 2, sku: "VEG-001", notes: "Red, ripe" },
+      {
+        id: "1",
+        name: "Fresh Organic Tomatoes",
+        quantity: 2,
+        sku: "VEG-001",
+        notes: "Red, ripe",
+      },
       { id: "2", name: "Whole Grain Bread", quantity: 1, sku: "BAK-045" },
-      { id: "3", name: "Glass Bottle Milk", quantity: 3, sku: "DAI-012", notes: "Keep upright" }
-    ]
+      {
+        id: "3",
+        name: "Glass Bottle Milk",
+        quantity: 3,
+        sku: "DAI-012",
+        notes: "Keep upright",
+      },
+    ],
+  };
+
+  const handleVerifyOtp = async () => {
+    if (code.length !== 4) {
+      Alert.alert("Invalid", "Please enter a 4-digit code");
+      return;
+    }
+
+    try {
+      setIsVerifying(true);
+      const res = await VerifyPickupOtpApi({ orderId, otp: code });
+
+      if (res?.success) {
+        Alert.alert("✅ Verified", "Pickup OTP verified successfully");
+        onNext();
+      } else {
+        Alert.alert("❌ Failed", res?.message || "Invalid code");
+      }
+    } catch (error) {
+      Alert.alert("Error", "Failed to verify code. Please try again.");
+    } finally {
+      setIsVerifying(false);
+    }
   };
 
   const toggleItems = () => setItemsExpanded(!itemsExpanded);
   const toggleNotes = () => setNotesExpanded(!notesExpanded);
 
   return (
-    // <SafeAreaView>
-    <ScrollView contentContainerStyle={{ flexGrow: 1}}>
+    <ScrollView contentContainerStyle={{ flexGrow: 1 }}>
       <View style={styles.content}>
         {/* Header Section */}
         <View style={styles.header}>
@@ -57,11 +102,12 @@ const PickupDetails: React.FC<PickupDetailsProps> = ({ onNext }) => {
           <Text style={styles.address}>{orderData.pickupAddress}</Text>
         </View>
 
-        
-                {/* Verification Code Input */}
+        {/* Verification Code Input */}
         <View style={styles.verificationCard}>
           <Text style={styles.verificationTitle}>🔐 Ask for the Verification Pin</Text>
-          <Text style={styles.verificationSubtext}>Enter the pickup code provided by the store</Text>
+          <Text style={styles.verificationSubtext}>
+            Enter the pickup code provided by the store
+          </Text>
           <TextInput
             style={styles.input}
             placeholder="Enter 4-digit code"
@@ -72,20 +118,21 @@ const PickupDetails: React.FC<PickupDetailsProps> = ({ onNext }) => {
           />
         </View>
 
-                {/* Action Buttons */}
-      <TouchableOpacity 
-        style={[
-          styles.button, 
-          styles.primaryButton, 
-          code.length !== 4 && styles.buttonDisabled
-        ]} 
-        onPress={onNext}
-        disabled={code.length !== 4} // disabled unless 6 digits are entered
-      >
-        <Text style={styles.buttonText}>✓ Verify & Confirm Pickup</Text>
-      </TouchableOpacity>
+        {/* Action Button */}
+        <TouchableOpacity
+          style={[
+            styles.button,
+            styles.primaryButton,
+            (code.length !== 4 || isVerifying) && styles.buttonDisabled,
+          ]}
+          onPress={handleVerifyOtp}
+          disabled={code.length !== 4 || isVerifying}
+        >
+          <Text style={styles.buttonText}>
+            {isVerifying ? "Verifying..." : "✓ Verify & Confirm Pickup"}
+          </Text>
+        </TouchableOpacity>
 
-        
         {/* Order Summary */}
         <View style={styles.card}>
           <Text style={styles.cardTitle}>📦 Order Summary</Text>
@@ -99,26 +146,38 @@ const PickupDetails: React.FC<PickupDetailsProps> = ({ onNext }) => {
               <Text style={styles.summaryLabel}>Est. Distance</Text>
             </View>
           </View>
-        </View> 
+        </View>
 
-        {/* Items List - Expandable */}
-        <TouchableOpacity style={styles.card} onPress={toggleItems} activeOpacity={0.7}>
+        {/* Items List */}
+        <TouchableOpacity
+          style={styles.card}
+          onPress={toggleItems}
+          activeOpacity={0.7}
+        >
           <View style={styles.expandHeader}>
             <Text style={styles.cardTitle}>📋 Items to Pickup</Text>
-            <Text style={styles.expandIcon}>{itemsExpanded ? '▼' : '▶'}</Text>
+            <Text style={styles.expandIcon}>{itemsExpanded ? "▼" : "▶"}</Text>
           </View>
-          
+
           {itemsExpanded && (
             <View style={styles.expandedContent}>
               {orderData.items.map((item, index) => (
-                <View key={item.id} style={[styles.itemRow, index !== orderData.items.length - 1 && styles.itemBorder]}>
+                <View
+                  key={item.id}
+                  style={[
+                    styles.itemRow,
+                    index !== orderData.items.length - 1 && styles.itemBorder,
+                  ]}
+                >
                   <View style={styles.itemQuantity}>
                     <Text style={styles.quantityText}>{item.quantity}x</Text>
-  </View>
+                  </View>
                   <View style={styles.itemDetails}>
                     <Text style={styles.itemName}>{item.name}</Text>
                     {item.sku && <Text style={styles.itemSku}>SKU: {item.sku}</Text>}
-                    {item.notes && <Text style={styles.itemNotes}>Note: {item.notes}</Text>}
+                    {item.notes && (
+                      <Text style={styles.itemNotes}>Note: {item.notes}</Text>
+                    )}
                   </View>
                 </View>
               ))}
@@ -126,34 +185,19 @@ const PickupDetails: React.FC<PickupDetailsProps> = ({ onNext }) => {
           )}
         </TouchableOpacity>
 
-
-        {/* Customer Information */}
-        {/* <View style={styles.card}>
-          <Text style={styles.cardTitle}>👤 Customer Details</Text>
-          <View style={styles.infoRow}>
-            <Text style={styles.label}>Name:</Text>
-            <Text style={styles.value}>{orderData.customerName}</Text>
-          </View>
-          <View style={styles.infoRow}>
-            <Text style={styles.label}>Phone:</Text>
-            <TouchableOpacity>
-              <Text style={[styles.value, styles.phoneLink]}>{orderData.customerPhone}</Text>
-            </TouchableOpacity>
-          </View>
-        </View> */}
-
-
-        {/* Special Instructions - Expandable */}
+        {/* Special Instructions */}
         {orderData.specialInstructions && (
-          <TouchableOpacity style={styles.card} onPress={toggleNotes} activeOpacity={0.7}>
+          <TouchableOpacity style={styles.card} onPress={toggleNotes}>
             <View style={styles.expandHeader}>
               <Text style={styles.cardTitle}>⚠️ Special Instructions</Text>
-              <Text style={styles.expandIcon}>{notesExpanded ? '▼' : '▶'}</Text>
+              <Text style={styles.expandIcon}>{notesExpanded ? "▼" : "▶"}</Text>
             </View>
-            
+
             {notesExpanded && (
               <View style={styles.expandedContent}>
-                <Text style={styles.instructionsText}>{orderData.specialInstructions}</Text>
+                <Text style={styles.instructionsText}>
+                  {orderData.specialInstructions}
+                </Text>
               </View>
             )}
           </TouchableOpacity>
@@ -161,9 +205,7 @@ const PickupDetails: React.FC<PickupDetailsProps> = ({ onNext }) => {
 
         <View style={styles.bottomSpacing} />
       </View>
-      {/* <View style={{ height: 230 }} /> */}
     </ScrollView>
-    // </SafeAreaView>
   );
 };
 
