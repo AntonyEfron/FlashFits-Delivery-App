@@ -1,40 +1,38 @@
-import React, { useState } from 'react';
-import AcceptOrder from './AcceptOrder';
-import ReachPickup from './ReachPickup';
-import PickupDetails from './PickupDetails';
-import DeliveryDetails from './DeliveryDetails';
-import EarningsSummary from './EarningsSummary';
-import ReachDeliveryLocation from './ReachDeliveryLocation';
-import ReturnVerification from './ReturnVerification';
-import ReachReturnLocation from './ReachReturnLocation';
-import MerchantReturnVerification from './MerchantReturnVerification';
-import { useRouter } from 'expo-router';
+import React, { useEffect, useState } from "react";
+import { useRouter, useLocalSearchParams } from "expo-router";
+import AcceptOrder from "./AcceptOrder";
+import ReachPickup from "./ReachPickup";
+import PickupDetails from "./PickupDetails";
+import DeliveryDetails from "./DeliveryDetails";
+import EarningsSummary from "./EarningsSummary";
+import ReachDeliveryLocation from "./ReachDeliveryLocation";
+import ReturnVerification from "./ReturnVerification";
+import ReachReturnLocation from "./ReachReturnLocation";
+import MerchantReturnVerification from "./MerchantReturnVerification";
 
 const OrderFlow: React.FC = () => {
-  console.log("order flow");
-  const [step, setStep] = useState<number>(0);
   const router = useRouter();
+  const { step } = useLocalSearchParams();
+  const [currentStep, setCurrentStep] = useState<number>(parseInt(step as string) || 0);
 
-  /** Handle delivery step navigation logic */
-  const handleDeliveryNext = (route: 'earnings' | 'returnVerification') => {
-    if (route === 'earnings') setStep(8); // direct to earnings
-    else setStep(5); // go to return verification
+  const handleDeliveryNext = (route: "earnings" | "returnVerification") => {
+    if (route === "earnings") setCurrentStep(8);
+    else setCurrentStep(5);
   };
 
-  /** Ordered screen sequence */
   const screens = [
-    <AcceptOrder key="accept" onNext={() => setStep(1)} />,
-    <ReachPickup key="reachPickup" onNext={() => setStep(2)} />,
-    <PickupDetails key="pickupDetails" onNext={() => setStep(3)} />,
-    <ReachDeliveryLocation key="reachDelivery" onNext={() => setStep(4)} />,
+    <AcceptOrder key="accept" onNext={() => setCurrentStep(1)} />,
+    <ReachPickup key="reachPickup" onNext={() => setCurrentStep(2)} />,
+    <PickupDetails key="pickupDetails" onNext={() => setCurrentStep(3)} />,
+    <ReachDeliveryLocation key="reachDelivery" onNext={() => setCurrentStep(4)} />,
     <DeliveryDetails key="deliveryDetails" onNext={handleDeliveryNext} />,
-    <ReturnVerification key="returnVerify" onNext={() => setStep(6)} />, // after OTP → reach return
-    <ReachReturnLocation key="reachReturn" onNext={() => setStep(7)} />, // after reaching merchant → verify
-    <MerchantReturnVerification key="merchantVerify" onNext={() => setStep(8)} />, // loader → earnings
-    <EarningsSummary key="earnings" onFinish={() => router.push('/(home)')} />,
+    <ReturnVerification key="returnVerify" onNext={() => setCurrentStep(6)} />,
+    <ReachReturnLocation key="reachReturn" onNext={() => setCurrentStep(7)} />,
+    <MerchantReturnVerification key="merchantVerify" onNext={() => setCurrentStep(8)} />,
+    <EarningsSummary key="earnings" onFinish={() => router.push("/(home)")} />,
   ];
 
-  return <>{screens[step]}</>;
+  return <>{screens[currentStep]}</>;
 };
 
 export default OrderFlow;

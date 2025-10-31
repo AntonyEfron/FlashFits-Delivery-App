@@ -7,6 +7,7 @@ import * as Location from "expo-location";
 import NavBarHomeScreen from "@/components/HomeScreen/NavBarHomeScreen";
 import DeliveryStatusCard from "@/components/HomeScreen/DeliveryStatusCard";
 import DailyProgressCard from "@/components/HomeScreen/DailyProgressCard";
+import OrderInProgressCard from "@/components/HomeScreen/OrderInProgressCard";
 import {
   connectRiderSocket,
   disconnectRiderSocket,
@@ -71,11 +72,33 @@ export default function HomeScreen() {
 
   // ✅ Listen for "orderAssigned" event and navigate
   useEffect(() => {
-    const handleOrderAssigned = (payload: any) => {
+    const handleOrderAssigned = async (payload: any) => {
       console.log("📦 Order assigned on Home:", payload);
 
-      // Optionally store payload for later retrieval
-      SecureStore.setItemAsync("currentOrder", JSON.stringify(payload));
+      console.log("✅ Payload order data:", payload);
+
+      // Extract only pickup and delivery amount safely
+      const orderData = {
+        orderId: payload?._doc?._id,
+        pickupLocationCorrdinates: payload?.pickupLocation || "null",
+        pickupAddress: payload._doc?.address || "null",
+        deliveryAmount: payload?.deliveryAmount || 0,
+        shopName: payload?._doc?.merchantId?.shopName || "Unknown Shop",
+        items: payload?._doc?.items,
+        deliveryDistance: payload?._doc?.deliveryDistance,
+        customerLocation: payload?.customerLocation,
+        cutomerAddress: payload?._doc?.cutomerAddress || "null",
+        deliveryCharge: payload?._doc?.deliveryCharge || 0,
+      };
+
+      const status = await SecureStore.getItemAsync("status");
+
+      if (status) {
+        await SecureStore.deleteItemAsync("status");
+      }
+      // Store only relevant data securely
+      await SecureStore.setItemAsync("acceptOrder", JSON.stringify(orderData));
+      console.log("✅ Stored order data:", orderData);
 
       // Navigate to order flow page
       router.push("/(orderFlow)");
@@ -103,10 +126,10 @@ export default function HomeScreen() {
         contentContainerStyle={styles.scrollInner}
         showsVerticalScrollIndicator={false}
       >
-        <DeliveryStatusCard
-          isOnline={isOnline}
-          onGoOnline={handleGoOnline}
-        />
+        <DeliveryStatusCard isOnline={isOnline} onGoOnline={handleGoOnline} />
+
+        <OrderInProgressCard />
+
         <DailyProgressCard />
       </ScrollView>
     </>

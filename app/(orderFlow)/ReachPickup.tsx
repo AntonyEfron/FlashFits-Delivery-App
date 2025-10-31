@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { View, Text, TouchableOpacity, StyleSheet, Linking, Alert } from "react-native";
 import { ReachPickUpLocation } from "../api/orderFlow";
 import { getCurrentLocation } from "../../utils/updateLocation";
@@ -9,36 +9,52 @@ interface ReachPickupProps {
 }
 
 const ReachPickup: React.FC<ReachPickupProps> = ({ onNext }) => {
+  const [orderData, setOrderData] = useState<any>(null);
 
+  useEffect(() => {
+    const fetchOrder = async () => {
+      try {
+        const storedData = await SecureStore.getItemAsync("acceptOrder");
+        if (!storedData) {
+          Alert.alert("Error", "No order found in storage.");
+          return;
+        }
+        const parsedOrder = JSON.parse(storedData);
+        setOrderData(parsedOrder);
+        console.log("✅ Loaded order:", parsedOrder);
+      } catch (err) {
+        console.error("❌ Error fetching stored order:", err);
+      }
+    };
+
+    fetchOrder();
+  }, []);
+
+  /** 🧭 Static pickup coordinates */
   const pickupCoords = { lat: 9.9675883, lng: 76.2994220 };
 
-  /** 🌍 Utility to calculate distance between two coordinates (Haversine formula) */
+  /** 🌍 Distance calculator (Haversine formula) */
   const getDistanceFromLatLonInMeters = (lat1: number, lon1: number, lat2: number, lon2: number) => {
-    const R = 6371000; // Earth radius in meters
+    const R = 6371000;
     const dLat = ((lat2 - lat1) * Math.PI) / 180;
     const dLon = ((lon2 - lon1) * Math.PI) / 180;
     const a =
-      Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+      Math.sin(dLat / 2) ** 2 +
       Math.cos((lat1 * Math.PI) / 180) *
         Math.cos((lat2 * Math.PI) / 180) *
-        Math.sin(dLon / 2) *
-        Math.sin(dLon / 2);
-    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-    return R * c;
+        Math.sin(dLon / 2) ** 2;
+    return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
   };
 
-  /** ✅ Handle Reach Pickup button */
+  /** ✅ Handle Reach Pickup */
   const handleReachPickup = async () => {
     try {
-      const orderData = await SecureStore.getItemAsync("currentOrder");
-     if (!orderData) {
-      Alert.alert("Error", "No current order found.");
-      return;
-    }
-    const order = JSON.parse(orderData); // ✅ Convert string to object
-    const orderId = order.orderId;       // ✅ Extract orderId
-    console.log(orderId, "📦 orderId");
-     
+      if (!orderData) {
+        Alert.alert("Error", "Order not found.");
+        return;
+      }
+
+      const orderId = orderData.orderId;
       const currentLoc = await getCurrentLocation();
       if (!currentLoc) {
         Alert.alert("Error", "Unable to fetch current location.");
@@ -59,22 +75,23 @@ const ReachPickup: React.FC<ReachPickupProps> = ({ onNext }) => {
         return;
       }
 
-      await ReachPickUpLocation({ orderId, coordinates: pickupCoords });
-      Alert.alert("Success", "Reached pickup location confirmed.");
-      onNext();
+      const result = await ReachPickUpLocation({ orderId, coordinates: pickupCoords });
+      if (result) {
+        await SecureStore.setItemAsync("orderStep", JSON.stringify("2"));
+        Alert.alert("Success", "Reached pickup location confirmed.");
+        onNext();
+      }
     } catch (error) {
-      Alert.alert("Error", "Failed to send pickup log");
       console.error("❌ Error in handleReachPickup:", error);
+      Alert.alert("Error", "Failed to send pickup log");
     }
   };
 
-  /** 🗺️ Open pickup location in Google Maps */
+  /** 🗺️ Open in Google Maps */
   const openInGoogleMaps = () => {
     const { lat, lng } = pickupCoords;
     const url = `https://www.google.com/maps?q=${lat},${lng}`;
-    Linking.openURL(url).catch(() => {
-      Alert.alert("Error", "Unable to open Google Maps");
-    });
+    Linking.openURL(url).catch(() => Alert.alert("Error", "Unable to open Google Maps"));
   };
 
   const FakeMap = () => (
@@ -90,12 +107,16 @@ const ReachPickup: React.FC<ReachPickupProps> = ({ onNext }) => {
     <View style={styles.root}>
       <FakeMap />
       <View style={styles.sheet}>
-        <Text style={styles.locationLabel}>SELECT PICKUP LOCATION</Text>
+        <Text style={styles.locationLabel}>PICKUP LOCATION</Text>
         <View style={styles.addressRow}>
           <View>
-            <Text style={styles.addressTitle}>Rudrampeta</Text>
+            <Text style={styles.addressTitle}>
+              {orderData?.shopName ? orderData.shopName : "Shop name not available"}
+            </Text>
             <Text style={styles.addressDetails}>
-              Rudrampeta, Anantapur, Andhra Pradesh, India
+              {orderData?.pickupAddress && orderData.pickupAddress !== "null"
+                ? orderData.pickupAddress
+                : "Pickup address not available"}
             </Text>
           </View>
         </View>
@@ -108,6 +129,7 @@ const ReachPickup: React.FC<ReachPickupProps> = ({ onNext }) => {
   );
 };
 
+/** 💅 Styles */
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: "#f1f5f9" },
   mapContainer: {

@@ -37,9 +37,9 @@ console.log('reachedPickupLocation');
   }
 };
 
-export const VerifyPickupOtp = async ({ orderId, otp }) => {
+export const VerifyPickupOtpApi = async ({ orderId, otp }) => {
   try {
-    const response = await axiosInstance.post("/deliveryRider/order/VerifyPickupOtp", {
+    const response = await axiosInstance.post("/deliveryRider/order/verifyOtp", {
       orderId,
       otp,
     });
@@ -48,6 +48,42 @@ export const VerifyPickupOtp = async ({ orderId, otp }) => {
     return response.data;
   } catch (error) {
     console.error("❌ Error verifying OTP:", error.response?.data || error.message);
+    throw error;
+  }
+};
+
+export const ReachedCustomerLocationApi = async ({ orderId, latitude, longitude }) => {
+  try {
+    const response = await axiosInstance.post("/deliveryRider/order/reachedCustomerLocation", {
+      orderId,
+      latitude,
+      longitude,
+    });
+
+    console.log("✅ Reached customer location logged:", response.data);
+    return response.data;
+  } catch (error) {
+    console.error(
+      "❌ Error marking reached customer location:",
+      error.response?.data || error.message
+    );
+    throw error;
+  }
+};
+
+export const HandoverPackageApi = async ({ orderId }) => {
+  try {
+    const response = await axiosInstance.post("/deliveryRider/order/handOutProducts", {
+      orderId,
+    });
+
+    console.log("✅ Package handover logged:", response.data);
+    return response.data;
+  } catch (error) {
+    console.error(
+      "❌ Error marking package handover:",
+      error.response?.data || error.message
+    );
     throw error;
   }
 };

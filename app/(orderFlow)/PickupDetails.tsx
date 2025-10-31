@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import {
   View,
   Text,
@@ -7,72 +7,51 @@ import {
   StyleSheet,
   ScrollView,
   Alert,
+  ActivityIndicator,
 } from "react-native";
+import * as SecureStore from "expo-secure-store";
 import { VerifyPickupOtpApi } from "../api/orderFlow";
 
-interface OrderItem {
-  id: string;
-  name: string;
-  quantity: number;
-  sku?: string;
-  notes?: string;
-}
+const PickupDetails: React.FC<{ onNext: () => void }> = ({ onNext }) => {
+  const [code, setCode] = useState("");
+  const [isVerifying, setIsVerifying] = useState(false);
+  const [order, setOrder] = useState<any>(null);
+  const [itemsExpanded, setItemsExpanded] = useState(true);
+  const [notesExpanded, setNotesExpanded] = useState(true);
+  const [loading, setLoading] = useState(true);
 
-interface PickupDetailsProps {
-  onNext: () => void;
-  orderId: string; // added to pass to API
-}
-
-const PickupDetails: React.FC<PickupDetailsProps> = ({ onNext, orderId }) => {
-  const [code, setCode] = useState<string>("");
-  const [isVerifying, setIsVerifying] = useState<boolean>(false);
-  const [itemsExpanded, setItemsExpanded] = useState<boolean>(true);
-  const [notesExpanded, setNotesExpanded] = useState<boolean>(true);
-
-  // Sample order data - replace with actual props
-  const orderData = {
-    orderNumber: "ORD-56789",
-    customerName: "John Smith",
-    customerPhone: "+1 (555) 123-4567",
-    pickupAddress: "123 Main Street, Downtown",
-    storeName: "Fresh Market Store",
-    totalItems: 3,
-    Distance: "2.5 Km",
-    specialInstructions: "Handle with care - contains fragile items",
-    items: [
-      {
-        id: "1",
-        name: "Fresh Organic Tomatoes",
-        quantity: 2,
-        sku: "VEG-001",
-        notes: "Red, ripe",
-      },
-      { id: "2", name: "Whole Grain Bread", quantity: 1, sku: "BAK-045" },
-      {
-        id: "3",
-        name: "Glass Bottle Milk",
-        quantity: 3,
-        sku: "DAI-012",
-        notes: "Keep upright",
-      },
-    ],
-  };
+  useEffect(() => {
+    const fetchOrder = async () => {
+      try {
+        const storedOrder = await SecureStore.getItemAsync("acceptOrder");
+        if (storedOrder) {
+          const parsedOrder = JSON.parse(storedOrder);
+          console.log("Fetched order from SecureStore:", parsedOrder);
+          setOrder(parsedOrder);
+        }
+      } catch (error) {
+        console.error("Error fetching order:", error);
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchOrder();
+  }, []);
 
   const handleVerifyOtp = async () => {
     if (code.length !== 4) {
       Alert.alert("Invalid", "Please enter a 4-digit code");
       return;
     }
-
     try {
       setIsVerifying(true);
-      const res = await VerifyPickupOtpApi({ orderId, otp: code });
-
-      if (res?.success) {
-        Alert.alert("✅ Verified", "Pickup OTP verified successfully");
+      const res = await VerifyPickupOtpApi({
+        orderId: order?.orderId,
+        otp: code,
+      });
+      if (res) {
+        await SecureStore.setItemAsync("orderStep", JSON.stringify("3"));
         onNext();
-      } else {
-        Alert.alert("❌ Failed", res?.message || "Invalid code");
       }
     } catch (error) {
       Alert.alert("Error", "Failed to verify code. Please try again.");
@@ -81,32 +60,52 @@ const PickupDetails: React.FC<PickupDetailsProps> = ({ onNext, orderId }) => {
     }
   };
 
-  const toggleItems = () => setItemsExpanded(!itemsExpanded);
-  const toggleNotes = () => setNotesExpanded(!notesExpanded);
+  if (loading) {
+    return (
+      <View style={styles.center}>
+        <ActivityIndicator size="large" color="#f59e0b" />
+        <Text style={{ marginTop: 10 }}>Loading order...</Text>
+      </View>
+    );
+  }
+
+  if (!order) {
+    return (
+      <View style={styles.center}>
+        <Text style={{ fontSize: 16, color: "#6b7280" }}>No order found.</Text>
+      </View>
+    );
+  }
 
   return (
     <ScrollView contentContainerStyle={{ flexGrow: 1 }}>
       <View style={styles.content}>
-        {/* Header Section */}
+        {/* Header */}
         <View style={styles.header}>
           <View style={styles.statusBadge}>
-            <Text style={styles.statusText}>READY FOR PICKUP</Text>
+            <Text style={styles.statusText}>
+              {order.status || "READY FOR PICKUP"}
+            </Text>
           </View>
-          <Text style={styles.orderNumber}>{orderData.orderNumber}</Text>
+          <Text style={styles.orderNumber}>
+            {order.orderNumber
+              ? order.orderNumber.toUpperCase()
+              : `ORD-${String(order.orderId).slice(-4).toUpperCase()}`}
+          </Text>
         </View>
 
-        {/* Store Information */}
+        {/* Pickup Location */}
         <View style={styles.card}>
           <Text style={styles.cardTitle}>📍 Pickup Location</Text>
-          <Text style={styles.storeName}>{orderData.storeName}</Text>
-          <Text style={styles.address}>{orderData.pickupAddress}</Text>
+          <Text style={styles.storeName}>{order.shopName}</Text>
+          <Text style={styles.address}>{order.pickupAddress}</Text>
         </View>
 
-        {/* Verification Code Input */}
+        {/* OTP */}
         <View style={styles.verificationCard}>
-          <Text style={styles.verificationTitle}>🔐 Ask for the Verification Pin</Text>
+          <Text style={styles.verificationTitle}>🔐 Pickup Verification</Text>
           <Text style={styles.verificationSubtext}>
-            Enter the pickup code provided by the store
+            Enter the 4-digit pickup code provided by the store
           </Text>
           <TextInput
             style={styles.input}
@@ -118,7 +117,6 @@ const PickupDetails: React.FC<PickupDetailsProps> = ({ onNext, orderId }) => {
           />
         </View>
 
-        {/* Action Button */}
         <TouchableOpacity
           style={[
             styles.button,
@@ -133,40 +131,41 @@ const PickupDetails: React.FC<PickupDetailsProps> = ({ onNext, orderId }) => {
           </Text>
         </TouchableOpacity>
 
-        {/* Order Summary */}
+        {/* Summary */}
         <View style={styles.card}>
           <Text style={styles.cardTitle}>📦 Order Summary</Text>
           <View style={styles.summaryGrid}>
             <View style={styles.summaryItem}>
-              <Text style={styles.summaryValue}>{orderData.totalItems}</Text>
+              <Text style={styles.summaryValue}>
+                {order.items?.length || 0}
+              </Text>
               <Text style={styles.summaryLabel}>Total Items</Text>
             </View>
             <View style={styles.summaryItem}>
-              <Text style={styles.summaryValue}>{orderData.Distance}</Text>
+              <Text style={styles.summaryValue}>{order.distance || "—"}</Text>
               <Text style={styles.summaryLabel}>Est. Distance</Text>
             </View>
           </View>
         </View>
 
-        {/* Items List */}
+        {/* Items */}
         <TouchableOpacity
           style={styles.card}
-          onPress={toggleItems}
-          activeOpacity={0.7}
+          onPress={() => setItemsExpanded(!itemsExpanded)}
         >
           <View style={styles.expandHeader}>
             <Text style={styles.cardTitle}>📋 Items to Pickup</Text>
             <Text style={styles.expandIcon}>{itemsExpanded ? "▼" : "▶"}</Text>
           </View>
 
-          {itemsExpanded && (
+          {itemsExpanded && order.items && (
             <View style={styles.expandedContent}>
-              {orderData.items.map((item, index) => (
+              {order.items.map((item: any, index: number) => (
                 <View
-                  key={item.id}
+                  key={item.id || index}
                   style={[
                     styles.itemRow,
-                    index !== orderData.items.length - 1 && styles.itemBorder,
+                    index !== order.items.length - 1 && styles.itemBorder,
                   ]}
                 >
                   <View style={styles.itemQuantity}>
@@ -174,7 +173,9 @@ const PickupDetails: React.FC<PickupDetailsProps> = ({ onNext, orderId }) => {
                   </View>
                   <View style={styles.itemDetails}>
                     <Text style={styles.itemName}>{item.name}</Text>
-                    {item.sku && <Text style={styles.itemSku}>SKU: {item.sku}</Text>}
+                    {item.sku && (
+                      <Text style={styles.itemSku}>SKU: {item.sku}</Text>
+                    )}
                     {item.notes && (
                       <Text style={styles.itemNotes}>Note: {item.notes}</Text>
                     )}
@@ -185,9 +186,12 @@ const PickupDetails: React.FC<PickupDetailsProps> = ({ onNext, orderId }) => {
           )}
         </TouchableOpacity>
 
-        {/* Special Instructions */}
-        {orderData.specialInstructions && (
-          <TouchableOpacity style={styles.card} onPress={toggleNotes}>
+        {/* Notes */}
+        {order.specialInstructions && (
+          <TouchableOpacity
+            style={styles.card}
+            onPress={() => setNotesExpanded(!notesExpanded)}
+          >
             <View style={styles.expandHeader}>
               <Text style={styles.cardTitle}>⚠️ Special Instructions</Text>
               <Text style={styles.expandIcon}>{notesExpanded ? "▼" : "▶"}</Text>
@@ -196,249 +200,185 @@ const PickupDetails: React.FC<PickupDetailsProps> = ({ onNext, orderId }) => {
             {notesExpanded && (
               <View style={styles.expandedContent}>
                 <Text style={styles.instructionsText}>
-                  {orderData.specialInstructions}
+                  {order.specialInstructions}
                 </Text>
               </View>
             )}
           </TouchableOpacity>
         )}
-
-        <View style={styles.bottomSpacing} />
       </View>
     </ScrollView>
   );
 };
 
 const styles = StyleSheet.create({
-  container: {
+  // same as yours ...
+  center: {
     flex: 1,
-    backgroundColor: '#f5f5f5',
+    justifyContent: "center",
+    alignItems: "center",
   },
   content: {
     padding: 16,
   },
   header: {
     marginBottom: 20,
-    alignItems: 'center',
+    alignItems: "center",
   },
   statusBadge: {
-    backgroundColor: '#10b981',
+    backgroundColor: "#10b981",
     paddingHorizontal: 16,
     paddingVertical: 6,
     borderRadius: 20,
     marginBottom: 12,
   },
   statusText: {
-    color: '#fff',
+    color: "#fff",
     fontSize: 12,
-    fontWeight: '700',
-    letterSpacing: 0.5,
+    fontWeight: "700",
   },
   orderNumber: {
     fontSize: 28,
-    fontWeight: '800',
-    color: '#1f2937',
+    fontWeight: "800",
+    color: "#1f2937",
   },
   card: {
-    backgroundColor: '#fff',
+    backgroundColor: "#fff",
     borderRadius: 12,
     padding: 16,
     marginBottom: 12,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
-    shadowRadius: 4,
     elevation: 2,
   },
   cardTitle: {
     fontSize: 16,
-    fontWeight: '700',
-    color: '#374151',
+    fontWeight: "700",
+    color: "#374151",
     marginBottom: 12,
   },
   storeName: {
     fontSize: 18,
-    fontWeight: '600',
-    color: '#1f2937',
+    fontWeight: "600",
+    color: "#1f2937",
     marginBottom: 4,
   },
   address: {
     fontSize: 14,
-    color: '#6b7280',
-    lineHeight: 20,
-  },
-  infoRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginBottom: 8,
-  },
-  label: {
-    fontSize: 14,
-    color: '#6b7280',
-    fontWeight: '500',
-  },
-  value: {
-    fontSize: 14,
-    color: '#1f2937',
-    fontWeight: '600',
-  },
-  phoneLink: {
-    color: '#3b82f6',
+    color: "#6b7280",
   },
   summaryGrid: {
-    flexDirection: 'row',
-    justifyContent: 'space-around',
+    flexDirection: "row",
+    justifyContent: "space-around",
   },
-  summaryItem: {
-    alignItems: 'center',
-  },
+  summaryItem: { alignItems: "center" },
   summaryValue: {
     fontSize: 24,
-    fontWeight: '700',
-    color: '#f59e0b',
-    marginBottom: 4,
+    fontWeight: "700",
+    color: "#f59e0b",
   },
   summaryLabel: {
     fontSize: 12,
-    color: '#6b7280',
-  },
-  expandHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-  expandIcon: {
-    fontSize: 16,
-    color: '#9ca3af',
-  },
-  expandedContent: {
-    marginTop: 12,
-    paddingTop: 12,
-    borderTopWidth: 1,
-    borderTopColor: '#e5e7eb',
-  },
-  itemRow: {
-    flexDirection: 'row',
-    paddingVertical: 12,
-  },
-  itemBorder: {
-    borderBottomWidth: 1,
-    borderBottomColor: '#f3f4f6',
-  },
-  itemQuantity: {
-    backgroundColor: '#f59e0b',
-    borderRadius: 8,
-    width: 40,
-    height: 40,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginRight: 12,
-  },
-  quantityText: {
-    color: '#fff',
-    fontWeight: '700',
-    fontSize: 14,
-  },
-  itemDetails: {
-    flex: 1,
-  },
-  itemName: {
-    fontSize: 15,
-    fontWeight: '600',
-    color: '#1f2937',
-    marginBottom: 2,
-  },
-  itemSku: {
-    fontSize: 12,
-    color: '#9ca3af',
-    marginBottom: 2,
-  },
-  itemNotes: {
-    fontSize: 12,
-    color: '#6b7280',
-    fontStyle: 'italic',
-  },
-  instructionsText: {
-    fontSize: 14,
-    color: '#dc2626',
-    lineHeight: 20,
-    backgroundColor: '#fef2f2',
-    padding: 12,
-    borderRadius: 8,
-    borderLeftWidth: 3,
-    borderLeftColor: '#dc2626',
+    color: "#6b7280",
   },
   verificationCard: {
-    backgroundColor: '#fff',
+    backgroundColor: "#fff",
     borderRadius: 12,
     padding: 20,
     marginBottom: 12,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
-    shadowRadius: 4,
-    elevation: 2,
   },
   verificationTitle: {
     fontSize: 18,
-    fontWeight: '700',
-    color: '#1f2937',
-    marginBottom: 4,
+    fontWeight: "700",
+    color: "#1f2937",
   },
   verificationSubtext: {
     fontSize: 13,
-    color: '#6b7280',
+    color: "#6b7280",
     marginBottom: 16,
   },
   input: {
     borderWidth: 2,
-    borderColor: '#e5e7eb',
+    borderColor: "#e5e7eb",
     borderRadius: 10,
     padding: 16,
     fontSize: 20,
-    fontWeight: '600',
-    textAlign: 'center',
+    textAlign: "center",
     letterSpacing: 4,
-    backgroundColor: '#f9fafb',
-  },
-  buttonContainer: {
-    marginTop: 8,
+    backgroundColor: "#f9fafb",
   },
   button: {
     padding: 16,
     borderRadius: 12,
     marginBottom: 12,
-    alignItems: 'center',
+    alignItems: "center",
   },
   primaryButton: {
-    backgroundColor: '#f59e0b',
-    shadowColor: '#f59e0b',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
-    elevation: 4,
+    backgroundColor: "#f59e0b",
   },
   buttonDisabled: {
-    backgroundColor: '#d1d5db',
-    shadowOpacity: 0,
+    backgroundColor: "#d1d5db",
   },
   buttonText: {
-    color: '#fff',
+    color: "#fff",
     fontSize: 17,
-    fontWeight: '700',
+    fontWeight: "700",
   },
-  secondaryButton: {
-    backgroundColor: '#fff',
-    borderWidth: 2,
-    borderColor: '#3b82f6',
+  expandHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
   },
-  secondaryButtonText: {
-    color: '#3b82f6',
-    fontSize: 17,
-    fontWeight: '700',
+  expandIcon: {
+    fontSize: 16,
+    color: "#9ca3af",
   },
-  bottomSpacing: {
-    height: 20,
+  expandedContent: {
+    marginTop: 12,
+    paddingTop: 12,
+    borderTopWidth: 1,
+    borderTopColor: "#e5e7eb",
+  },
+  itemRow: {
+    flexDirection: "row",
+    paddingVertical: 12,
+  },
+  itemBorder: {
+    borderBottomWidth: 1,
+    borderBottomColor: "#f3f4f6",
+  },
+  itemQuantity: {
+    backgroundColor: "#f59e0b",
+    borderRadius: 8,
+    width: 40,
+    height: 40,
+    justifyContent: "center",
+    alignItems: "center",
+    marginRight: 12,
+  },
+  quantityText: {
+    color: "#fff",
+    fontWeight: "700",
+  },
+  itemDetails: { flex: 1 },
+  itemName: {
+    fontSize: 15,
+    fontWeight: "600",
+    color: "#1f2937",
+  },
+  itemSku: {
+    fontSize: 12,
+    color: "#9ca3af",
+  },
+  itemNotes: {
+    fontSize: 12,
+    color: "#6b7280",
+  },
+  instructionsText: {
+    fontSize: 14,
+    color: "#dc2626",
+    lineHeight: 20,
+    backgroundColor: "#fef2f2",
+    padding: 12,
+    borderRadius: 8,
   },
 });
 
