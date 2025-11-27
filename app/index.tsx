@@ -1,32 +1,52 @@
 import { useEffect, useState } from "react";
-import { Redirect, router } from "expo-router";
+import { Redirect } from "expo-router";
 import * as SecureStore from "expo-secure-store";
 import { ActivityIndicator, View, Text } from "react-native";
 import { useLocationPermission } from "../hooks/useLocationPermission";
+import { getRider } from "./api/auth";
 
 export default function Index() {
   const { hasPermission, locationEnabled } = useLocationPermission();
   const [isLoading, setIsLoading] = useState(true);
-  const [redirectPath, setRedirectPath] = useState<
+  const [redirectPath, setRedirectPath] = useState< 
     "/(home)" | "/(auth)" | "/(register)" | "/(orderFlow)" | null
   >(null);
 
-  // ✅ Check authentication and initial redirect
   useEffect(() => {
     const checkAuth = async () => {
       try {
         const token = await SecureStore.getItemAsync("token");
-        const verifiedStatus = true; // Replace with actual rider verification check
 
+        // No token → go to login
         if (!token) {
+          // console.log('notokern');
           setRedirectPath("/(auth)");
-        } else if (verifiedStatus === false) {
+          setIsLoading(false);
+          return;
+        }
+        // Fetch rider details
+        const res = await getRider();
+        console.log(res,'RODER');
+        const rider = res.deliveryRider;
+
+        console.log("Verified:", rider.isVerified);
+        console.log("Current Order:", rider.currentOrderId);
+
+        // If rider has an active order → go to orderFlow immediately
+        if (rider.currentOrderId) {
+          setRedirectPath("/(orderFlow)");
+        }
+        // If not verified → go to register
+        else if (!rider.isVerified) {
           setRedirectPath("/(register)");
-        } else {
+        }
+        // Else → home
+        else {
           setRedirectPath("/(home)");
         }
+
       } catch (error) {
-        console.error("Error checking auth:", error);
+        console.error("Auth check error:", error);
         setRedirectPath("/(auth)");
       } finally {
         setIsLoading(false);
@@ -36,44 +56,27 @@ export default function Index() {
     checkAuth();
   }, []);
 
-  
-  // const [order, setOrder] = useState<any>(null);
-
-  // // ✅ Listen for "orderAssigned" socket event
-  // useEffect(() => {
-  //   const handleOrder = (payload: any) => {
-  //     console.log("📦 Received order on screen:", payload);
-  //     setOrder(payload);
-
-  //     // Navigate to OrderFlow
-  //     router.push("/orderFlow"); // adjust route if needed
-  //   };
-
-  //   emitter.on("orderAssigned", handleOrder);
-
-  //   return () => {
-  //     emitter.off("orderAssigned", handleOrder);
-  //   };
-  // }, []);
-
-  // ⏳ Show loading until permissions + auth resolved
+  // ⏳ Waiting for location permissions
   if (!hasPermission || !locationEnabled) {
     return (
       <View className="flex-1 items-center justify-center bg-white">
         <ActivityIndicator size="large" />
-        <Text style={{ marginTop: 10 }}>Waiting for location permission...</Text>
+        <Text style={{ marginTop: 10 }}>
+          Waiting for location permission...
+        </Text>
       </View>
     );
   }
 
+  // ⏳ Still loading auth + rider check
   if (isLoading || !redirectPath) {
     return (
-      <View style={{ flex: 1, justifyContent: "center", alignItems: "center" }}>
+      <View className="flex-1 items-center justify-center bg-white">
         <ActivityIndicator size="large" color="#007AFF" />
       </View>
     );
   }
 
-  // ✅ Redirects automatically when redirectPath changes
+  // 🎯 Final Redirect
   return <Redirect href={redirectPath} />;
 }

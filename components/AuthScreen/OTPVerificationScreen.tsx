@@ -16,9 +16,10 @@ import {
 } from 'react-native';
 import { router } from "expo-router";
 import { LinearGradient } from 'expo-linear-gradient';
-import {verifyPhoneOtp} from '../../app/api/auth'
+import { verifyPhoneOtp } from '../../app/api/auth'
 import * as SecureStore from "expo-secure-store";
 // import { connectRiderSocket } from '../../config/socketConfig';
+import { getRider } from '../../app/api/auth';
 
 const { width, height } = Dimensions.get('window');
 
@@ -27,9 +28,9 @@ type OTPVerificationScreenProps = {
   onBack: () => void;
 };
 
-const OTPVerificationScreen: React.FC<OTPVerificationScreenProps> = ({ 
-  phoneNumber, 
-  onBack 
+const OTPVerificationScreen: React.FC<OTPVerificationScreenProps> = ({
+  phoneNumber,
+  onBack
 }) => {
   const [otp, setOtp] = useState<string[]>(['', '', '', '', '', '']);
   const [isLoading, setIsLoading] = useState(false);
@@ -37,7 +38,7 @@ const OTPVerificationScreen: React.FC<OTPVerificationScreenProps> = ({
   const [canResend, setCanResend] = useState(false);
 
   const inputRefs = useRef<Array<TextInput | null>>([]);
-  
+
   // Animation values
   const fadeAnim = useRef(new Animated.Value(0)).current;
   const slideAnim = useRef(new Animated.Value(50)).current;
@@ -185,69 +186,75 @@ const OTPVerificationScreen: React.FC<OTPVerificationScreenProps> = ({
     }
   };
 
-const verifyOTP = async (otpCode: string) => {
-  console.log(phoneNumber, "phoneNumber", otpCode);
-  try {
-    setIsLoading(true);
+  const verifyOTP = async (otpCode: string) => {
+    console.log(phoneNumber, "phoneNumber", otpCode);
+    try {
+      setIsLoading(true);
 
-    const res = await verifyPhoneOtp(phoneNumber, otpCode);
-    // console.log("✅ OTP verification success:", res.data);
+      const res = await verifyPhoneOtp(phoneNumber, otpCode);
+      // console.log("✅ OTP verification success:", res.data);
 
-    const { status, data } = res;
-    // console.log(status, "status");
-    
-    const rider = data?.deliveryRider;
-    // console.log(rider, "rider");
-    
+      const { status, data } = res;
+
+      console.log(res, status, data, "status");
+
+      const rider = data?.deliveryRider;
+      // console.log(rider, "rider");
+
 
       if (status === 201 || status === 200) {
-        // Save token + verification status
         await Promise.all([
           SecureStore.setItemAsync("token", data?.token ?? ""),
           SecureStore.setItemAsync("isVerified", String(rider?.isVerified ?? false)),
           SecureStore.setItemAsync("deliveryRiderId", String(rider?._id ?? "")),
         ]);
-        // await connectRiderSocket(rider?.id);
 
         Alert.alert(
           "Success 🎉",
           rider?.isVerified ? "Welcome back!" : "Please complete registration."
         );
-        // Always redirect to index, let index.tsx decide
-          if (rider?.isVerified) {
-            router.replace("/(home)");
-          } else {
-            router.replace("/(register)");
-          }
+
+        // 🔥 NEW LOGIC HERE
+        if (rider?.currentOrderId) {
+          router.replace("/(orderFlow)");
+          return;
+        }
+
+        if (rider?.isVerified) {
+          router.replace("/(home)");
+        } else {
+          router.replace("/(register)");
+        }
       }
-  } catch (error: any) {
-    console.error("❌ OTP verification failed:", error);
-    Alert.alert(
-      "OTP verification failed ❌",
-      error.response?.data?.message || "Please try again."
-    );
 
-    // Error shake animation
-    Vibration.vibrate([0, 100, 50, 100]);
-    Animated.sequence([
-      Animated.timing(shakeAnim, { toValue: 15, duration: 100, useNativeDriver: true }),
-      Animated.timing(shakeAnim, { toValue: -15, duration: 100, useNativeDriver: true }),
-      Animated.timing(shakeAnim, { toValue: 0, duration: 100, useNativeDriver: true }),
-    ]).start();
+    } catch (error: any) {
+      console.error("❌ OTP verification failed:", error);
+      Alert.alert(
+        "OTP verification failed ❌",
+        error.response?.data?.message || "Please try again."
+      );
 
-    setOtp(["", "", "", "", "", ""]);
-    setTimeout(() => inputRefs.current[0]?.focus(), 500);
-  } finally {
-    setIsLoading(false);
-  }
-};
+      // Error shake animation
+      Vibration.vibrate([0, 100, 50, 100]);
+      Animated.sequence([
+        Animated.timing(shakeAnim, { toValue: 15, duration: 100, useNativeDriver: true }),
+        Animated.timing(shakeAnim, { toValue: -15, duration: 100, useNativeDriver: true }),
+        Animated.timing(shakeAnim, { toValue: 0, duration: 100, useNativeDriver: true }),
+      ]).start();
+
+      setOtp(["", "", "", "", "", ""]);
+      setTimeout(() => inputRefs.current[0]?.focus(), 500);
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
 
   const handleResendOTP = () => {
     setTimer(30);
     setCanResend(false);
     setOtp(['', '', '', '', '', '']);
-    
+
     // Reset and animate inputs
     otpInputAnims.forEach((anim, index) => {
       anim.setValue(0);
@@ -293,24 +300,24 @@ const verifyOTP = async (otpCode: string) => {
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
     >
       <StatusBar barStyle="light-content" backgroundColor="#667eea" />
-      
+
       {/* Animated Background Gradient */}
-      <LinearGradient 
-        colors={['#f1f3faff', '#424242ff', '#2c2b2dff']} 
+      <LinearGradient
+        colors={['#f1f3faff', '#424242ff', '#2c2b2dff']}
         style={styles.gradient}
         start={{ x: 0, y: 0 }}
         end={{ x: 1, y: 1 }}
       >
 
-          {/* Back Button */}
-          <TouchableOpacity style={styles.backButton} onPress={onBack}>
-            <LinearGradient
-              colors={['rgba(255, 255, 255, 0.2)', 'rgba(255, 255, 255, 0.1)']}
-              style={styles.backButtonGradient}
-            >
-              <Text style={styles.backButtonText}>← Back</Text>
-            </LinearGradient>
-          </TouchableOpacity>
+        {/* Back Button */}
+        <TouchableOpacity style={styles.backButton} onPress={onBack}>
+          <LinearGradient
+            colors={['rgba(255, 255, 255, 0.2)', 'rgba(255, 255, 255, 0.1)']}
+            style={styles.backButtonGradient}
+          >
+            <Text style={styles.backButtonText}>← Back</Text>
+          </LinearGradient>
+        </TouchableOpacity>
 
         {/* Floating Elements */}
         <View style={styles.floatingElements}>
@@ -344,7 +351,7 @@ const verifyOTP = async (otpCode: string) => {
                 <Text style={styles.iconText}>🔐</Text>
               </LinearGradient>
             </View>
-            
+
             <Text style={styles.title}>Verify Phone Number</Text>
             <Text style={styles.subtitle}>
               Enter the 6-digit code sent to{'\n'}
@@ -511,12 +518,12 @@ const styles = StyleSheet.create({
     paddingHorizontal: 30,
     paddingVertical: 50,
   },
-backButton: {
-  position: 'absolute',
-  top: Platform.OS === 'ios' ? 50 : 30, // leave room for status bar
-  left: 20,
-  zIndex: 10, // keep it above other elements
-},
+  backButton: {
+    position: 'absolute',
+    top: Platform.OS === 'ios' ? 50 : 30, // leave room for status bar
+    left: 20,
+    zIndex: 10, // keep it above other elements
+  },
   backButtonGradient: {
     paddingHorizontal: 20,
     paddingVertical: 12,
