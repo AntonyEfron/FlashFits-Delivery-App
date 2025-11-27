@@ -13,41 +13,49 @@ import {
 } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
 import { MaterialCommunityIcons, Ionicons } from '@expo/vector-icons';
+import { ReturnVerificationApi } from '../api/orderFlow';
 
 interface ReturnVerificationProps {
   onNext: () => void;
+  orderId: string;
 }
 
-const ReturnVerification: React.FC<ReturnVerificationProps> = ({ onNext }) => {
+const ReturnVerification: React.FC<ReturnVerificationProps> = ({ onNext, orderId }) => {
   const [image, setImage] = useState<string | null>(null);
   const [otp, setOtp] = useState('');
 
-  const openCamera = async () => {
-    const { status } = await ImagePicker.requestCameraPermissionsAsync();
-    if (status !== 'granted') {
-      Alert.alert('Permission required', 'Camera access is needed to take a photo.');
-      return;
-    }
+  // const openCamera = async () => {
+  //   const { status } = await ImagePicker.requestCameraPermissionsAsync();
+  //   if (status !== 'granted') {
+  //     Alert.alert('Permission required', 'Camera access is needed to take a photo.');
+  //     return;
+  //   }
 
-    const result = await ImagePicker.launchCameraAsync({
-      allowsEditing: true,
-      quality: 0.8,
-    });
+  //   const result = await ImagePicker.launchCameraAsync({
+  //     allowsEditing: true,
+  //     quality: 0.8,
+  //   });
 
-    if (!result.canceled) {
-      setImage(result.assets[0].uri);
-    }
-  };
+  //   if (!result.canceled) {
+  //     setImage(result.assets[0].uri);
+  //   }
+  // };
 
-  const handleSubmit = () => {
-    if (!image) {
-      Alert.alert('Upload Required', 'Please upload or take a return proof photo.');
-      return;
-    }
+  const handleSubmit = async () => {
+   
     if (otp.trim().length !== 4) {
       Alert.alert('Invalid OTP', 'Please enter a valid 4-digit OTP.');
       return;
     }
+    try {
+      const response = await ReturnVerificationApi({ orderId: orderId, otp });
+      console.log('Return verification response:', response);
+    } catch (error) {
+      console.error('Error verifying return:', error);
+      Alert.alert('Verification Failed', 'Failed to verify return. Please try again.');
+      return;
+    }
+
 
     Alert.alert('Verification Complete', 'Return successfully verified!', [
       { text: 'OK', onPress: onNext },
@@ -65,35 +73,6 @@ const ReturnVerification: React.FC<ReturnVerificationProps> = ({ onNext }) => {
         showsVerticalScrollIndicator={false}
         keyboardShouldPersistTaps="handled"
       >
-        {/* Header */}
-        <View style={styles.header}>
-          <MaterialCommunityIcons name="package-variant-closed" size={60} color="#1e3a8a" />
-          <Text style={styles.title}>Return Verification</Text>
-          <Text style={styles.subtitle}>
-            Upload proof photo and enter customer OTP to complete the return process.
-          </Text>
-        </View>
-
-        {/* Upload Section */}
-        <View style={styles.section}>
-          <Text style={styles.sectionLabel}>Upload Return Proof</Text>
-          {image ? (
-            <TouchableOpacity onPress={openCamera} style={styles.imagePreviewWrapper}>
-              <Image source={{ uri: image }} style={styles.imagePreview} />
-              <View style={styles.overlay}>
-                <Ionicons name="camera" size={24} color="#fff" />
-                <Text style={styles.overlayText}>Change Photo</Text>
-              </View>
-            </TouchableOpacity>
-          ) : (
-            <View>
-              <TouchableOpacity style={styles.uploadBox} onPress={openCamera}>
-                <Ionicons name="camera-outline" size={50} color="#9ca3af" />
-                <Text style={styles.uploadText}>Take Photo Using Camera</Text>
-              </TouchableOpacity>
-            </View>
-          )}
-        </View>
 
         {/* OTP Section */}
         <View style={styles.section}>

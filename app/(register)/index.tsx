@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   View,
   Text,
@@ -17,12 +17,7 @@ import { ActivityIndicator } from "react-native";
 import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
 import DateTimePicker from '@react-native-community/datetimepicker';
-import { submitPersonalDetails, uploadDocuments, submitBankDetails} from "../api/registration";
-
-const cities = [
-  'Mumbai', 'Delhi', 'Bengaluru', 'Hyderabad', 'Chennai', 'Kolkata',
-  'Pune', 'Ahmedabad', 'Jaipur', 'Surat', 'Lucknow', 'Indore',
-];
+import { submitPersonalDetails, uploadDocuments, submitBankDetails, getZones } from "../api/registration";
 
 const bankNames = [
   "State Bank of India (SBI)",
@@ -37,25 +32,10 @@ const bankNames = [
   "Union Bank of India",
 ];
 
-const areasByCity = {
-  Mumbai: ['Andheri', 'Bandra', 'Borivali', 'Dadar', 'Goregaon', 'Malad', 'Powai', 'Thane'],
-  Delhi: ['Connaught Place', 'Dwarka', 'Karol Bagh', 'Lajpat Nagar', 'Nehru Place', 'Rohini', 'Saket'],
-  Bengaluru: ['Indiranagar', 'Koramangala', 'Whitefield', 'Jayanagar', 'HSR Layout', 'BTM Layout', 'Electronic City'],
-  Hyderabad: ['Banjara Hills', 'Hitech City', 'Gachibowli', 'Madhapur', 'Kukatpally', 'Secunderabad'],
-  Chennai: ['Anna Nagar', 'T Nagar', 'Velachery', 'Adyar', 'Porur', 'Tambaram', 'OMR'],
-  Kolkata: ['Park Street', 'Salt Lake', 'Howrah', 'Ballygunge', 'Behala', 'Jadavpur'],
-  Pune: ['Kothrud', 'Hinjewadi', 'Wakad', 'Baner', 'Viman Nagar', 'Hadapsar', 'Pimpri'],
-  Ahmedabad: ['Satellite', 'Vastrapur', 'Bodakdev', 'Maninagar', 'Naroda', 'Chandkheda'],
-  Jaipur: ['Malviya Nagar', 'Vaishali Nagar', 'Mansarovar', 'C-Scheme', 'Raja Park'],
-  Surat: ['Adajan', 'Vesu', 'Pal', 'City Light', 'Varachha', 'Althan'],
-  Lucknow: ['Gomti Nagar', 'Hazratganj', 'Alambagh', 'Indira Nagar', 'Aliganj'],
-  Indore: ['Vijay Nagar', 'MG Road', 'Bhanwarkuan', 'Rau', 'Palasia', 'Nipania'],
-};
-
 
 
 const DeliveryPartnerEnrollment = () => {
-  const [step, setStep] = useState(5);
+  const [step, setStep] = useState(1);
   const [fullName, setFullName] = useState('');
   const [dob, setDob] = useState(new Date());
   const [showDatePicker, setShowDatePicker] = useState(false);
@@ -64,20 +44,22 @@ const DeliveryPartnerEnrollment = () => {
   const [email, setEmail] = useState('');
   const [city, setCity] = useState('');
   const [area, setArea] = useState('');
-  const [pincode, setPincode] = useState('');
+  const [selectedZone, setSelectedZone] = useState('');
+  const [zones, setZones] = useState<any[]>([]);
   const [showAreaDropdown, setShowAreaDropdown] = useState(false);
   const [showCityDropdown, setShowCityDropdown] = useState(false);
   const [showGenderDropdown, setShowGenderDropdown] = useState(false);
-const [aadhaarFront, setAadhaarFront] = useState<string | null>(null);
-const [aadhaarBack, setAadhaarBack] = useState<string | null>(null);
-const [licenseFront, setLicenseFront] = useState<string | null>(null);
-const [licenseBack, setLicenseBack] = useState<string | null>(null);
-const [panFront, setPanFront] = useState<string | null>(null);
-const [panBack, setPanBack] = useState<string | null>(null);
+  const [aadhaarFront, setAadhaarFront] = useState<string | null>(null);
+  const [aadhaarBack, setAadhaarBack] = useState<string | null>(null);
+  const [licenseFront, setLicenseFront] = useState<string | null>(null);
+  const [licenseBack, setLicenseBack] = useState<string | null>(null);
+  const [panFront, setPanFront] = useState<string | null>(null);
+  const [panBack, setPanBack] = useState<string | null>(null);
   const [videoWatched, setVideoWatched] = useState(false);
   const [showBankDropdown, setShowBankDropdown] = useState(false);
   const [confirmAccountNumber, setConfirmAccountNumber] = useState('');
   const [holderName, setHolderName] = useState('');
+  const [pincode, setPincode] = useState('');
 
   // Bank details
   const [bankName, setBankName] = useState('');
@@ -85,6 +67,28 @@ const [panBack, setPanBack] = useState<string | null>(null);
   const [ifsc, setIfsc] = useState('');
 
   const [loading, setLoading] = useState(false);
+
+  const getZonesData = async () => {
+    try {
+      const response = await getZones();
+      console.log(response.data);
+      setZones(response.data);
+    } catch (error) {
+      console.error("Error fetching zones:", error.response?.data || error.message);
+    }
+  }
+
+  useEffect(() => {
+    getZonesData();
+  }, [])
+
+  // Get unique cities from zones
+  const cities = [...new Set(zones.map(zone => zone.city))];
+  
+  // Get zones by city
+  const getZonesByCity = (cityName: string) => {
+    return zones.filter(zone => zone.city === cityName);
+  };
 
   const steps = [
     { num: 1, title: 'Personal', icon: 'person' },
@@ -94,7 +98,7 @@ const [panBack, setPanBack] = useState<string | null>(null);
     { num: 5, title: 'Payment', icon: 'card' },
   ];
 
-  const calculateAge = (birthDate) => {
+  const calculateAge = (birthDate: Date) => {
     const today = new Date();
     const age = today.getFullYear() - birthDate.getFullYear();
     const monthDiff = today.getMonth() - birthDate.getMonth();
@@ -104,7 +108,7 @@ const [panBack, setPanBack] = useState<string | null>(null);
     return age.toString();
   };
 
-  const onDateChange = (event, selectedDate) => {
+  const onDateChange = (event: any, selectedDate: Date | undefined) => {
     setShowDatePicker(false);
     if (selectedDate) {
       setDob(selectedDate);
@@ -112,113 +116,115 @@ const [panBack, setPanBack] = useState<string | null>(null);
     }
   };
 
-  const formatDate = (date) => {
+  const formatDate = (date: Date) => {
     const day = date.getDate().toString().padStart(2, '0');
     const month = (date.getMonth() + 1).toString().padStart(2, '0');
     const year = date.getFullYear();
     return `${day}/${month}/${year}`;
   };
 
-const nextStep = async () => {
-  if (step === 1) {
-    const personalData = {
-      fullName,
-      dob,
-      age,
-      gender,
-      email,
-      city,
-      area,
-      pincode,
-    };
-    try {
-      const response = await submitPersonalDetails(personalData);
-      console.log("Personal details saved:", response);
-      setStep(2); // move to next step if success
-      return; // stop further execution
-    } catch (error) {
-      Alert.alert("Error", "Failed to submit personal details. Please try again.");
-      return;
-    }
-  }
-
-  else if (step === 2) {
-    if (
-      !aadhaarFront || !aadhaarBack ||
-      !licenseFront || !licenseBack ||
-      !panFront || !panBack
-    ) {
-      Alert.alert('Missing Documents', 'Please upload all required documents (front & back).');
-      return;
+  const nextStep = async () => {
+    if (step === 1) {
+      console.log(selectedZone,"sss");
+      
+      const personalData = {
+        fullName,
+        dob,
+        age,
+        gender,
+        email,
+        city,
+        zone: selectedZone,
+        pincode,
+      };
+      try {
+        const response = await submitPersonalDetails(personalData);
+        console.log("Personal details saved:", response);
+        setStep(2); // move to next step if success
+        return; // stop further execution
+      } catch (error) {
+        Alert.alert("Error", "Failed to submit personal details. Please try again.");
+        return;
+      }
     }
 
-    const formData = new FormData();
-    formData.append("aadhaarFront", { uri: aadhaarFront, type: "image/jpeg", name: "aadhaar_front.jpg" });
-    formData.append("aadhaarBack", { uri: aadhaarBack, type: "image/jpeg", name: "aadhaar_back.jpg" });
-    formData.append("licenseFront", { uri: licenseFront, type: "image/jpeg", name: "license_front.jpg" });
-    formData.append("licenseBack", { uri: licenseBack, type: "image/jpeg", name: "license_back.jpg" });
-    formData.append("panFront", { uri: panFront, type: "image/jpeg", name: "pan_front.jpg" });
-    formData.append("panBack", { uri: panBack, type: "image/jpeg", name: "pan_back.jpg" });
+    else if (step === 2) {
+      if (
+        !aadhaarFront || !aadhaarBack ||
+        !licenseFront || !licenseBack ||
+        !panFront || !panBack
+      ) {
+        Alert.alert('Missing Documents', 'Please upload all required documents (front & back).');
+        return;
+      }
 
-    try {
-      setLoading(true);
-      const response = await uploadDocuments(formData);
-      console.log("Documents uploaded:", response);
-      setStep(3);
-      return; // stop here ✅
-    } catch (error) {
-      Alert.alert("Upload Failed", "Unable to upload documents. Please try again.");
-    } finally {
-      setLoading(false);
+      const formData = new FormData();
+      formData.append("aadhaarFront", { uri: aadhaarFront, type: "image/jpeg", name: "aadhaar_front.jpg" });
+      formData.append("aadhaarBack", { uri: aadhaarBack, type: "image/jpeg", name: "aadhaar_back.jpg" });
+      formData.append("licenseFront", { uri: licenseFront, type: "image/jpeg", name: "license_front.jpg" });
+      formData.append("licenseBack", { uri: licenseBack, type: "image/jpeg", name: "license_back.jpg" });
+      formData.append("panFront", { uri: panFront, type: "image/jpeg", name: "pan_front.jpg" });
+      formData.append("panBack", { uri: panBack, type: "image/jpeg", name: "pan_back.jpg" });
+
+      try {
+        setLoading(true);
+        const response = await uploadDocuments(formData);
+        console.log("Documents uploaded:", response);
+        setStep(3);
+        return; // stop here ✅
+      } catch (error) {
+        Alert.alert("Upload Failed", "Unable to upload documents. Please try again.");
+      } finally {
+        setLoading(false);
+      }
     }
-  }
 
-  else if (step === 3) {
-    if (!videoWatched) {
-      Alert.alert('Incomplete', 'Please confirm you have watched the training video.');
-      return;
+    else if (step === 3) {
+      if (!videoWatched) {
+        Alert.alert('Incomplete', 'Please confirm you have watched the training video.');
+        return;
+      }
+      setStep(4);
     }
-    setStep(4);
-  }
 
-else if (step === 4) {
-  if (!holderName || !bankName || !accountNumber || !confirmAccountNumber || !ifsc) {
-    Alert.alert('Missing Info', 'Please fill in all the required bank details.');
-    return;
-  }
+    else if (step === 4) {
+      if (!holderName || !bankName || !accountNumber || !confirmAccountNumber || !ifsc) {
+        Alert.alert('Missing Info', 'Please fill in all the required bank details.');
+        return;
+      }
 
-  if (accountNumber !== confirmAccountNumber) {
-    Alert.alert('Mismatch', 'Account numbers do not match. Please recheck.');
-    return;
-  }
+      if (accountNumber !== confirmAccountNumber) {
+        Alert.alert('Mismatch', 'Account numbers do not match. Please recheck.');
+        return;
+      }
 
-    const bankData = {
-      accountHolderName: holderName.trim(),
-      bankName: bankName.trim(),
-      accountNumber: accountNumber.trim(),
-      ifsc: ifsc.trim(),
-    };
-  try {
-    setLoading(true);
-    const response = await submitBankDetails(bankData);
-    console.log('Bank details API response:', response);
+      const bankData = {
+        accountHolderName: holderName.trim(),
+        bankName: bankName.trim(),
+        accountNumber: accountNumber.trim(),
+        ifsc: ifsc.trim(),
+      };
+      try {
+        setLoading(true);
+        const response = await submitBankDetails(bankData);
+        console.log('Bank details API response:', response);
 
-    // ✅ handle both success cases
-    if (response?.success || response?.status === 200) {
-      Alert.alert('Success', 'Bank details submitted successfully!');
-      setStep(5);
-    } else {
-      throw new Error(response?.message || 'Unexpected response');
+        // ✅ handle both success cases
+        if (response?.success || response?.status === 200) {
+          Alert.alert('Success', 'Bank details submitted successfully!');
+          setStep(5);
+        } else {
+          throw new Error(response?.message || 'Unexpected response');
+        }
+      } catch (error) {
+        console.error('Bank details submission error:', error);
+        Alert.alert('Error', 'Failed to submit bank details. Please try again.');
+      } finally {
+        setLoading(false);
+      }
     }
-  } catch (error) {
-    console.error('Bank details submission error:', error);
-    Alert.alert('Error', 'Failed to submit bank details. Please try again.');
-  } finally {
-    setLoading(false);
-  }
-}
 
-};
+  };
 
 
   const prevStep = () => setStep(prev => Math.max(prev - 1, 1));
@@ -251,13 +257,13 @@ else if (step === 4) {
   };
 
   return (
-    <KeyboardAvoidingView 
-      style={styles.fullScreen} 
+    <KeyboardAvoidingView
+      style={styles.fullScreen}
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
       keyboardVerticalOffset={Platform.OS === 'ios' ? 64 : 0}
     >
-      <ScrollView 
-        contentContainerStyle={styles.container} 
+      <ScrollView
+        contentContainerStyle={styles.container}
         showsVerticalScrollIndicator={false}
         keyboardShouldPersistTaps="handled"
       >
@@ -307,132 +313,132 @@ else if (step === 4) {
         {/* Step 1: Personal Info */}
         {step === 1 && (
           <>
-          <View style={styles.card}>
-            <View style={styles.cardHeader}>
-              {/* <Ionicons name="person-circle" size={24} color="#2563eb" /> */}
-              <Text style={styles.cardTitle}>Personal Information</Text>
-            </View>
-
-            <View style={styles.inputGroup}>
-              <Text style={styles.label}>Full Name *</Text>
-              <TextInput
-                style={styles.input}
-                placeholder="Enter your full name"
-                placeholderTextColor="#9ca3af"
-                value={fullName}
-                onChangeText={setFullName}
-                returnKeyType="next"
-              />
-            </View>
-
-            <View style={styles.inputGroup}>
-              <Text style={styles.label}>Date of Birth *</Text>
-              <TouchableOpacity
-                style={styles.dateInput}
-                onPress={() => setShowDatePicker(true)}
-              >
-                <Ionicons name="calendar" size={20} color="#6b7280" />
-                <Text style={styles.dateText}>{formatDate(dob)}</Text>
-                <Ionicons name="chevron-down" size={20} color="#6b7280" />
-              </TouchableOpacity>
-            </View>
-
-            {showDatePicker && (
-              <DateTimePicker
-                value={dob}
-                mode="date"
-                display="spinner"
-                onChange={onDateChange}
-                maximumDate={new Date()}
-              />
-            )}
-
-            <View style={styles.inputGroup}>
-              <Text style={styles.label}>Age</Text>
-              <View style={styles.ageDisplay}>
-                <Text style={styles.ageText}>{age || '--'} years</Text>
-              </View>
-            </View>
-
-            <View style={styles.inputGroup}>
-              <Text style={styles.label}>Gender</Text>
-              <TouchableOpacity
-                style={styles.dropdownInput}
-                onPress={() => setShowGenderDropdown(true)}
-              >
-                <Text style={[styles.dropdownText, !gender && styles.placeholderText]}>
-                  {gender || 'Select gender'}
-                </Text>
-                <Ionicons name="chevron-down" size={20} color="#6b7280" />
-              </TouchableOpacity>
-            </View>
-
-            <View style={styles.inputGroup}>
-              <Text style={styles.label}>Email Address *</Text>
-              <TextInput
-                style={styles.input}
-                placeholder="your.email@example.com"
-                placeholderTextColor="#9ca3af"
-                value={email}
-                onChangeText={setEmail}
-                keyboardType="email-address"
-                autoCapitalize="none"
-                returnKeyType="next"
-              />
-            </View>
-
-            
-            <View style={styles.inputGroup}>
-              <Text style={styles.label}>Pincode *</Text>
-              <TextInput
-                style={styles.input}
-                placeholder="Enter 6-digit pincode"
-                placeholderTextColor="#9ca3af"
-                keyboardType="numeric"
-                maxLength={6}
-                value={pincode}
-                onChangeText={setPincode}
-                returnKeyType="done"
-              />
-            </View>
-          </View>
-
             <View style={styles.card}>
               <View style={styles.cardHeader}>
-              <Text style={styles.cardTitle}>Select City/Area for Delivery</Text>
-            </View>
+                {/* <Ionicons name="person-circle" size={24} color="#2563eb" /> */}
+                <Text style={styles.cardTitle}>Personal Information</Text>
+              </View>
 
-            <View style={styles.inputGroup}>
-              <Text style={styles.label}>City / Area *</Text>
-              <TouchableOpacity
-                style={styles.dropdownInput}
-                onPress={() => setShowCityDropdown(true)}
-              >
-                <Ionicons name="location" size={20} color="#6b7280" />
-                <Text style={[styles.dropdownText, !city && styles.placeholderText]}>
-                  {city || 'Select your city'}
-                </Text>
-                <Ionicons name="chevron-down" size={20} color="#6b7280" />
-              </TouchableOpacity>
-            </View>
-
-                        {city ? (
               <View style={styles.inputGroup}>
-                <Text style={styles.label}>Select Area *</Text>
+                <Text style={styles.label}>Full Name *</Text>
+                <TextInput
+                  style={styles.input}
+                  placeholder="Enter your full name"
+                  placeholderTextColor="#9ca3af"
+                  value={fullName}
+                  onChangeText={setFullName}
+                  returnKeyType="next"
+                />
+              </View>
+
+              <View style={styles.inputGroup}>
+                <Text style={styles.label}>Date of Birth *</Text>
+                <TouchableOpacity
+                  style={styles.dateInput}
+                  onPress={() => setShowDatePicker(true)}
+                >
+                  <Ionicons name="calendar" size={20} color="#6b7280" />
+                  <Text style={styles.dateText}>{formatDate(dob)}</Text>
+                  <Ionicons name="chevron-down" size={20} color="#6b7280" />
+                </TouchableOpacity>
+              </View>
+
+              {showDatePicker && (
+                <DateTimePicker
+                  value={dob}
+                  mode="date"
+                  display="spinner"
+                  onChange={onDateChange}
+                  maximumDate={new Date()}
+                />
+              )}
+
+              <View style={styles.inputGroup}>
+                <Text style={styles.label}>Age</Text>
+                <View style={styles.ageDisplay}>
+                  <Text style={styles.ageText}>{age || '--'} years</Text>
+                </View>
+              </View>
+
+              <View style={styles.inputGroup}>
+                <Text style={styles.label}>Gender</Text>
                 <TouchableOpacity
                   style={styles.dropdownInput}
-                  onPress={() => setShowAreaDropdown(true)}
+                  onPress={() => setShowGenderDropdown(true)}
                 >
-                  <Ionicons name="map" size={20} color="#6b7280" />
-                  <Text style={[styles.dropdownText, !area && styles.placeholderText]}>
-                    {area || 'Select your area'}
+                  <Text style={[styles.dropdownText, !gender && styles.placeholderText]}>
+                    {gender || 'Select gender'}
                   </Text>
                   <Ionicons name="chevron-down" size={20} color="#6b7280" />
                 </TouchableOpacity>
               </View>
-            ) : null}
-            
-          </View>
+
+              <View style={styles.inputGroup}>
+                <Text style={styles.label}>Email Address *</Text>
+                <TextInput
+                  style={styles.input}
+                  placeholder="your.email@example.com"
+                  placeholderTextColor="#9ca3af"
+                  value={email}
+                  onChangeText={setEmail}
+                  keyboardType="email-address"
+                  autoCapitalize="none"
+                  returnKeyType="next"
+                />
+              </View>
+
+
+              <View style={styles.inputGroup}>
+                <Text style={styles.label}>Pincode *</Text>
+                <TextInput
+                  style={styles.input}
+                  placeholder="Enter 6-digit pincode"
+                  placeholderTextColor="#9ca3af"
+                  keyboardType="numeric"
+                  maxLength={6}
+                  value={pincode}
+                  onChangeText={setPincode}
+                  returnKeyType="done"
+                />
+              </View>
+            </View>
+
+            <View style={styles.card}>
+              <View style={styles.cardHeader}>
+                <Text style={styles.cardTitle}>Select City/Area for Delivery</Text>
+              </View>
+
+              <View style={styles.inputGroup}>
+                <Text style={styles.label}>City / Area *</Text>
+                <TouchableOpacity
+                  style={styles.dropdownInput}
+                  onPress={() => setShowCityDropdown(true)}
+                >
+                  <Ionicons name="location" size={20} color="#6b7280" />
+                  <Text style={[styles.dropdownText, !city && styles.placeholderText]}>
+                    {city || 'Select your city'}
+                  </Text>
+                  <Ionicons name="chevron-down" size={20} color="#6b7280" />
+                </TouchableOpacity>
+              </View>
+
+              {city ? (
+                <View style={styles.inputGroup}>
+                  <Text style={styles.label}>Select Zone *</Text>
+                  <TouchableOpacity
+                    style={styles.dropdownInput}
+                    onPress={() => setShowAreaDropdown(true)}
+                  >
+                    <Ionicons name="map" size={20} color="#6b7280" />
+                    <Text style={[styles.dropdownText, !selectedZone && styles.placeholderText]}>
+                      {selectedZone ? zones.find(zone => zone._id === selectedZone)?.zoneName || 'Select your zone' : 'Select your zone'}
+                    </Text>
+                    <Ionicons name="chevron-down" size={20} color="#6b7280" />
+                  </TouchableOpacity>
+                </View>
+              ) : null}
+
+            </View>
 
           </>
         )}
@@ -454,9 +460,9 @@ else if (step === 4) {
                   <TouchableOpacity
                     style={[styles.cityItem, city === item && styles.selectedCityItem]}
                     onPress={() => {
-                      // When city changes → clear area selection
+                      // When city changes → clear zone selection
                       if (item !== city) {
-                        setArea('');
+                        setSelectedZone('');
                       }
                       setCity(item);
                       setShowCityDropdown(false);
@@ -477,26 +483,26 @@ else if (step === 4) {
           <View style={styles.modalContainer}>
             <View style={styles.modalBox}>
               <View style={styles.modalHeader}>
-                <Text style={styles.modalTitle}>Select Area</Text>
+                <Text style={styles.modalTitle}>Select Zone</Text>
                 <TouchableOpacity onPress={() => setShowAreaDropdown(false)}>
                   <Ionicons name="close-circle" size={28} color="#6b7280" />
                 </TouchableOpacity>
               </View>
               <FlatList
-                data={areasByCity[city] || []}
-                keyExtractor={(item) => item}
+                data={getZonesByCity(city)}
+                keyExtractor={(item) => item._id}
                 renderItem={({ item }) => (
                   <TouchableOpacity
-                    style={[styles.cityItem, area === item && styles.selectedCityItem]}
+                    style={[styles.cityItem, selectedZone === item._id && styles.selectedCityItem]}
                     onPress={() => {
-                      setArea(item);
+                      setSelectedZone(item._id);
                       setShowAreaDropdown(false);
                     }}
                   >
-                    <Text style={[styles.cityText, area === item && styles.selectedCityText]}>
-                      {item}
+                    <Text style={[styles.cityText, selectedZone === item._id && styles.selectedCityText]}>
+                      {item.zoneName}
                     </Text>
-                    {area === item && <Ionicons name="checkmark" size={20} color="#2563eb" />}
+                    {selectedZone === item._id && <Ionicons name="checkmark" size={20} color="#2563eb" />}
                   </TouchableOpacity>
                 )}
               />
@@ -535,37 +541,37 @@ else if (step === 4) {
         </Modal>
 
         {/* Step 2: Documents */}
-      {step === 2 && (
-        <View style={styles.card}>
-          <View style={styles.cardHeader}>
-            <Ionicons name="document-text" size={24} color="#2563eb" />
-            <Text style={styles.cardTitle}>Upload Documents</Text>
+        {step === 2 && (
+          <View style={styles.card}>
+            <View style={styles.cardHeader}>
+              <Ionicons name="document-text" size={24} color="#2563eb" />
+              <Text style={styles.cardTitle}>Upload Documents</Text>
+            </View>
+            <Text style={styles.cardSubtitle}>Please upload clear photos of both sides</Text>
+
+            <DocumentUploadBoxDouble
+              title="Aadhaar Card"
+              frontFile={aadhaarFront}
+              backFile={aadhaarBack}
+              onUploadFront={() => handleFileUpload(setAadhaarFront)}
+              onUploadBack={() => handleFileUpload(setAadhaarBack)}
+            />
+            <DocumentUploadBoxDouble
+              title="Driving License"
+              frontFile={licenseFront}
+              backFile={licenseBack}
+              onUploadFront={() => handleFileUpload(setLicenseFront)}
+              onUploadBack={() => handleFileUpload(setLicenseBack)}
+            />
+            <DocumentUploadBoxDouble
+              title="PAN Card"
+              frontFile={panFront}
+              backFile={panBack}
+              onUploadFront={() => handleFileUpload(setPanFront)}
+              onUploadBack={() => handleFileUpload(setPanBack)}
+            />
           </View>
-          <Text style={styles.cardSubtitle}>Please upload clear photos of both sides</Text>
-          
-          <DocumentUploadBoxDouble 
-            title="Aadhaar Card" 
-            frontFile={aadhaarFront}
-            backFile={aadhaarBack}
-            onUploadFront={() => handleFileUpload(setAadhaarFront)}
-            onUploadBack={() => handleFileUpload(setAadhaarBack)}
-          />
-          <DocumentUploadBoxDouble 
-            title="Driving License" 
-            frontFile={licenseFront}
-            backFile={licenseBack}
-            onUploadFront={() => handleFileUpload(setLicenseFront)}
-            onUploadBack={() => handleFileUpload(setLicenseBack)}
-          />
-          <DocumentUploadBoxDouble 
-            title="PAN Card" 
-            frontFile={panFront}
-            backFile={panBack}
-            onUploadFront={() => handleFileUpload(setPanFront)}
-            onUploadBack={() => handleFileUpload(setPanBack)}
-          />
-        </View>
-      )}
+        )}
 
         {/* Step 3: Training */}
         {step === 3 && (
@@ -575,7 +581,7 @@ else if (step === 4) {
               <Text style={styles.cardTitle}>Training Video</Text>
             </View>
             <Text style={styles.cardSubtitle}>Watch this short video to get started</Text>
-            
+
             <View style={styles.videoPlaceholder}>
               <View style={styles.playButton}>
                 <Ionicons name="play" size={40} color="white" />
@@ -583,7 +589,7 @@ else if (step === 4) {
               <Text style={styles.videoText}>Training Video - 5 minutes</Text>
               <Text style={styles.videoSubtext}>Learn about safety, delivery process & earnings</Text>
             </View>
-            
+
             <TouchableOpacity
               onPress={() => setVideoWatched(!videoWatched)}
               style={styles.checkboxContainer}
@@ -605,31 +611,31 @@ else if (step === 4) {
             </View>
             <Text style={styles.cardSubtitle}>For receiving your earnings</Text>
 
-          <View style={styles.inputGroup}>
-            <Text style={styles.label}>Bank Name *</Text>
-            <TouchableOpacity
-              style={styles.dropdownInput}
-              onPress={() => setShowBankDropdown(true)}
-            >
-              <Ionicons name="business" size={20} color="#6b7280" />
-              <Text style={[styles.dropdownText, !bankName && styles.placeholderText]}>
-                {bankName || "Select your bank"}
-              </Text>
-              <Ionicons name="chevron-down" size={20} color="#6b7280" />
-            </TouchableOpacity>
-          </View>
+            <View style={styles.inputGroup}>
+              <Text style={styles.label}>Bank Name *</Text>
+              <TouchableOpacity
+                style={styles.dropdownInput}
+                onPress={() => setShowBankDropdown(true)}
+              >
+                <Ionicons name="business" size={20} color="#6b7280" />
+                <Text style={[styles.dropdownText, !bankName && styles.placeholderText]}>
+                  {bankName || "Select your bank"}
+                </Text>
+                <Ionicons name="chevron-down" size={20} color="#6b7280" />
+              </TouchableOpacity>
+            </View>
 
             <View style={styles.inputGroup}>
-            <Text style={styles.label}>Account Holder Name *</Text>
-            <TextInput
-              style={styles.input}
-              placeholder="Enter account holder's name"
-              placeholderTextColor="#9ca3af"
-              value={holderName}
-              onChangeText={setHolderName}
-              returnKeyType="next"
-            />
-          </View>
+              <Text style={styles.label}>Account Holder Name *</Text>
+              <TextInput
+                style={styles.input}
+                placeholder="Enter account holder's name"
+                placeholderTextColor="#9ca3af"
+                value={holderName}
+                onChangeText={setHolderName}
+                returnKeyType="next"
+              />
+            </View>
 
 
             <View style={styles.inputGroup}>
@@ -646,17 +652,17 @@ else if (step === 4) {
             </View>
 
             <View style={styles.inputGroup}>
-            <Text style={styles.label}>Confirm Account Number *</Text>
-            <TextInput
-              style={styles.input}
-              placeholder="Re-enter account number"
-              placeholderTextColor="#9ca3af"
-              value={confirmAccountNumber}
-              keyboardType="numeric"
-              onChangeText={setConfirmAccountNumber}
-              returnKeyType="done"
-            />
-          </View>
+              <Text style={styles.label}>Confirm Account Number *</Text>
+              <TextInput
+                style={styles.input}
+                placeholder="Re-enter account number"
+                placeholderTextColor="#9ca3af"
+                value={confirmAccountNumber}
+                keyboardType="numeric"
+                onChangeText={setConfirmAccountNumber}
+                returnKeyType="done"
+              />
+            </View>
 
             <View style={styles.inputGroup}>
               <Text style={styles.label}>IFSC Code *</Text>
@@ -674,35 +680,35 @@ else if (step === 4) {
         )}
 
         <Modal visible={showBankDropdown} transparent animationType="slide">
-  <View style={styles.modalContainer}>
-    <View style={styles.modalBox}>
-      <View style={styles.modalHeader}>
-        <Text style={styles.modalTitle}>Select Bank</Text>
-        <TouchableOpacity onPress={() => setShowBankDropdown(false)}>
-          <Ionicons name="close-circle" size={28} color="#6b7280" />
-        </TouchableOpacity>
-      </View>
-      <FlatList
-        data={bankNames}
-        keyExtractor={(item) => item}
-        renderItem={({ item }) => (
-          <TouchableOpacity
-            style={[styles.cityItem, bankName === item && styles.selectedCityItem]}
-            onPress={() => {
-              setBankName(item);
-              setShowBankDropdown(false);
-            }}
-          >
-            <Text style={[styles.cityText, bankName === item && styles.selectedCityText]}>
-              {item}
-            </Text>
-            {bankName === item && <Ionicons name="checkmark" size={20} color="#2563eb" />}
-          </TouchableOpacity>
-        )}
-      />
-    </View>
-  </View>
-</Modal>
+          <View style={styles.modalContainer}>
+            <View style={styles.modalBox}>
+              <View style={styles.modalHeader}>
+                <Text style={styles.modalTitle}>Select Bank</Text>
+                <TouchableOpacity onPress={() => setShowBankDropdown(false)}>
+                  <Ionicons name="close-circle" size={28} color="#6b7280" />
+                </TouchableOpacity>
+              </View>
+              <FlatList
+                data={bankNames}
+                keyExtractor={(item) => item}
+                renderItem={({ item }) => (
+                  <TouchableOpacity
+                    style={[styles.cityItem, bankName === item && styles.selectedCityItem]}
+                    onPress={() => {
+                      setBankName(item);
+                      setShowBankDropdown(false);
+                    }}
+                  >
+                    <Text style={[styles.cityText, bankName === item && styles.selectedCityText]}>
+                      {item}
+                    </Text>
+                    {bankName === item && <Ionicons name="checkmark" size={20} color="#2563eb" />}
+                  </TouchableOpacity>
+                )}
+              />
+            </View>
+          </View>
+        </Modal>
 
         {/* Step 5: Payment */}
         {step === 5 && (
@@ -711,7 +717,7 @@ else if (step === 4) {
               <Ionicons name="card" size={24} color="#2563eb" />
               <Text style={styles.cardTitle}>Registration Fee</Text>
             </View>
-            
+
             <View style={styles.paymentBox}>
               <View style={styles.paymentHeader}>
                 <Ionicons name="shield-checkmark" size={32} color="white" />
@@ -734,19 +740,19 @@ else if (step === 4) {
               </View>
               <Text style={styles.paymentNote}>Non-refundable registration fee</Text>
             </View>
-            
+
             <TouchableOpacity onPress={handlePayment} style={styles.paymentButton}>
               <Ionicons name="lock-closed" size={20} color="white" />
               <Text style={styles.paymentButtonText}>Proceed to Secure Payment</Text>
             </TouchableOpacity>
           </View>
         )}
-              {loading && (
-                <View style={styles.loaderOverlay}>
-                  <ActivityIndicator size="large" color="#2563eb" />
-                  <Text style={styles.loaderText}>Uploading, please wait...</Text>
-                </View>
-              )}
+        {loading && (
+          <View style={styles.loaderOverlay}>
+            <ActivityIndicator size="large" color="#2563eb" />
+            <Text style={styles.loaderText}>Uploading, please wait...</Text>
+          </View>
+        )}
 
 
         {/* Navigation */}
@@ -774,8 +780,8 @@ const DocumentUploadBoxDouble = ({ title, frontFile, backFile, onUploadFront, on
     <Text style={styles.docTitle}>{title}</Text>
     <View style={styles.docRow}>
       {/* Front Side */}
-      <TouchableOpacity 
-        onPress={onUploadFront} 
+      <TouchableOpacity
+        onPress={onUploadFront}
         style={[styles.docSide, frontFile && styles.docSideUploaded]}
       >
         {frontFile ? (
@@ -794,8 +800,8 @@ const DocumentUploadBoxDouble = ({ title, frontFile, backFile, onUploadFront, on
       </TouchableOpacity>
 
       {/* Back Side */}
-      <TouchableOpacity 
-        onPress={onUploadBack} 
+      <TouchableOpacity
+        onPress={onUploadBack}
         style={[styles.docSide, backFile && styles.docSideUploaded]}
       >
         {backFile ? (
@@ -818,11 +824,11 @@ const DocumentUploadBoxDouble = ({ title, frontFile, backFile, onUploadFront, on
 
 
 const styles = StyleSheet.create({
-  fullScreen: { 
-    flex: 1, 
+  fullScreen: {
+    flex: 1,
     backgroundColor: '#f8fafc',
   },
-  container: { 
+  container: {
     padding: 16,
     paddingBottom: 80,
   },
@@ -840,113 +846,113 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginBottom: 12,
   },
-  heading: { 
-    fontSize: 28, 
-    fontWeight: '700', 
-    textAlign: 'center', 
+  heading: {
+    fontSize: 28,
+    fontWeight: '700',
+    textAlign: 'center',
     color: '#111827',
     marginBottom: 6,
   },
-  subheading: { 
-    textAlign: 'center', 
-    color: '#6b7280', 
+  subheading: {
+    textAlign: 'center',
+    color: '#6b7280',
     fontSize: 15,
   },
 
   docContainer: {
-  marginBottom: 20,
-},
-docTitle: {
-  fontSize: 15,
-  fontWeight: '600',
-  color: '#374151',
-  marginBottom: 10,
-},
-docRow: {
-  flexDirection: 'row',
-  gap: 12,
-},
-loaderOverlay: {
-  position: "absolute",
-  top: 0,
-  left: 0,
-  right: 0,
-  bottom: 0,
-  backgroundColor: "rgba(0,0,0,0.4)",
-  justifyContent: "center",
-  alignItems: "center",
-  zIndex: 999,
-},
-loaderText: {
-  marginTop: 10,
-  color: "#fff",
-  fontSize: 16,
-  fontWeight: "500",
-},
-docSide: {
-  flex: 1,
-  aspectRatio: 1.4,
-  borderWidth: 2,
-  borderColor: '#e5e7eb',
-  borderStyle: 'dashed',
-  borderRadius: 12,
-  justifyContent: 'center',
-  alignItems: 'center',
-  backgroundColor: '#fafafa',
-  position: 'relative',
-},
-docSideUploaded: {
-  borderColor: '#22c55e',
-  borderStyle: 'solid',
-  backgroundColor: '#f0fdf4',
-},
-docImage: {
-  width: '100%',
-  height: '100%',
-  borderRadius: 10,
-},
-docLabel: {
-  fontSize: 13,
-  color: '#6b7280',
-  marginTop: 6,
-  fontWeight: '500',
-},
-docBadge: {
-  position: 'absolute',
-  top: 6,
-  right: 6,
-  backgroundColor: 'white',
-  borderRadius: 12,
-  padding: 2,
-  shadowColor: '#000',
-  shadowOffset: { width: 0, height: 1 },
-  shadowOpacity: 0.1,
-  shadowRadius: 2,
-  elevation: 2,
-},
+    marginBottom: 20,
+  },
+  docTitle: {
+    fontSize: 15,
+    fontWeight: '600',
+    color: '#374151',
+    marginBottom: 10,
+  },
+  docRow: {
+    flexDirection: 'row',
+    gap: 12,
+  },
+  loaderOverlay: {
+    position: "absolute",
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: "rgba(0,0,0,0.4)",
+    justifyContent: "center",
+    alignItems: "center",
+    zIndex: 999,
+  },
+  loaderText: {
+    marginTop: 10,
+    color: "#fff",
+    fontSize: 16,
+    fontWeight: "500",
+  },
+  docSide: {
+    flex: 1,
+    aspectRatio: 1.4,
+    borderWidth: 2,
+    borderColor: '#e5e7eb',
+    borderStyle: 'dashed',
+    borderRadius: 12,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: '#fafafa',
+    position: 'relative',
+  },
+  docSideUploaded: {
+    borderColor: '#22c55e',
+    borderStyle: 'solid',
+    backgroundColor: '#f0fdf4',
+  },
+  docImage: {
+    width: '100%',
+    height: '100%',
+    borderRadius: 10,
+  },
+  docLabel: {
+    fontSize: 13,
+    color: '#6b7280',
+    marginTop: 6,
+    fontWeight: '500',
+  },
+  docBadge: {
+    position: 'absolute',
+    top: 6,
+    right: 6,
+    backgroundColor: 'white',
+    borderRadius: 12,
+    padding: 2,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.1,
+    shadowRadius: 2,
+    elevation: 2,
+  },
   // Modern Stepper
   stepperContainer: {
     marginBottom: 24,
     paddingHorizontal: 8,
   },
-  stepper: { 
-    flexDirection: 'row', 
-    alignItems: 'flex-start', 
+  stepper: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
     justifyContent: 'space-between',
   },
   stepWrapper: {
     alignItems: 'center',
     flex: 1,
   },
-  stepCircle: { 
-    width: 36, 
-    height: 36, 
-    borderRadius: 18, 
-    justifyContent: 'center', 
+  stepCircle: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    justifyContent: 'center',
     alignItems: 'center',
     marginBottom: 6,
   },
-  activeStep: { 
+  activeStep: {
     backgroundColor: '#2563eb',
     shadowColor: '#2563eb',
     shadowOffset: { width: 0, height: 4 },
@@ -954,10 +960,10 @@ docBadge: {
     shadowRadius: 8,
     elevation: 6,
   },
-  doneStep: { 
+  doneStep: {
     backgroundColor: '#22c55e',
   },
-  inactiveStep: { 
+  inactiveStep: {
     backgroundColor: '#e5e7eb',
   },
   stepNumber: {
@@ -978,24 +984,24 @@ docBadge: {
     color: '#2563eb',
     fontWeight: '600',
   },
-  stepLine: { 
+  stepLine: {
     position: 'absolute',
     top: 18,
     left: '50%',
     width: '100%',
-    height: 2, 
+    height: 2,
     backgroundColor: '#e5e7eb',
     zIndex: -1,
   },
-  doneLine: { 
+  doneLine: {
     backgroundColor: '#22c55e',
   },
-  
+
   // Card Styles
-  card: { 
-    backgroundColor: 'white', 
-    borderRadius: 16, 
-    padding: 20, 
+  card: {
+    backgroundColor: 'white',
+    borderRadius: 16,
+    padding: 20,
     marginBottom: 16,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
@@ -1009,9 +1015,9 @@ docBadge: {
     marginBottom: 8,
     gap: 10,
   },
-  cardTitle: { 
-    fontSize: 20, 
-    fontWeight: '700', 
+  cardTitle: {
+    fontSize: 20,
+    fontWeight: '700',
     color: '#111827',
   },
   cardSubtitle: {
@@ -1019,7 +1025,7 @@ docBadge: {
     color: '#6b7280',
     marginBottom: 20,
   },
-  
+
   // Input Styles
   inputGroup: {
     marginBottom: 16,
@@ -1030,10 +1036,10 @@ docBadge: {
     color: '#374151',
     marginBottom: 8,
   },
-  input: { 
-    borderWidth: 1.5, 
-    borderColor: '#e5e7eb', 
-    borderRadius: 12, 
+  input: {
+    borderWidth: 1.5,
+    borderColor: '#e5e7eb',
+    borderRadius: 12,
     padding: 14,
     fontSize: 15,
     color: '#111827',
@@ -1066,13 +1072,13 @@ docBadge: {
     color: '#1e40af',
     fontWeight: '600',
   },
-  dropdownInput: { 
-    flexDirection: 'row', 
-    justifyContent: 'space-between', 
-    alignItems: 'center', 
-    borderWidth: 1.5, 
-    borderColor: '#e5e7eb', 
-    borderRadius: 12, 
+  dropdownInput: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    borderWidth: 1.5,
+    borderColor: '#e5e7eb',
+    borderRadius: 12,
     padding: 14,
     backgroundColor: '#f9fafb',
     gap: 10,
@@ -1085,14 +1091,14 @@ docBadge: {
   placeholderText: {
     color: '#9ca3af',
   },
-  
+
   // Video Styles
-  videoPlaceholder: { 
-    backgroundColor: '#1e3a8a', 
-    borderRadius: 16, 
-    height: 200, 
-    justifyContent: 'center', 
-    alignItems: 'center', 
+  videoPlaceholder: {
+    backgroundColor: '#1e3a8a',
+    borderRadius: 16,
+    height: 200,
+    justifyContent: 'center',
+    alignItems: 'center',
     marginBottom: 16,
     overflow: 'hidden',
   },
@@ -1105,8 +1111,8 @@ docBadge: {
     alignItems: 'center',
     marginBottom: 12,
   },
-  videoText: { 
-    color: 'white', 
+  videoText: {
+    color: 'white',
     fontSize: 16,
     fontWeight: '600',
     marginBottom: 4,
@@ -1115,11 +1121,11 @@ docBadge: {
     color: 'rgba(255, 255, 255, 0.8)',
     fontSize: 13,
   },
-  
+
   // Checkbox
-  checkboxContainer: { 
-    flexDirection: 'row', 
-    alignItems: 'center', 
+  checkboxContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
     gap: 12,
     backgroundColor: '#f0f9ff',
     padding: 14,
@@ -1137,26 +1143,26 @@ docBadge: {
   checkboxChecked: {
     backgroundColor: '#2563eb',
   },
-  checkboxText: { 
-    color: '#1e40af', 
+  checkboxText: {
+    color: '#1e40af',
     fontSize: 14,
     flex: 1,
     fontWeight: '500',
   },
-  
+
   // Upload Box
-  uploadBox: { 
-    borderWidth: 2, 
-    borderColor: '#e5e7eb', 
-    borderStyle: 'dashed', 
-    borderRadius: 16, 
-    padding: 24, 
-    alignItems: 'center', 
+  uploadBox: {
+    borderWidth: 2,
+    borderColor: '#e5e7eb',
+    borderStyle: 'dashed',
+    borderRadius: 16,
+    padding: 24,
+    alignItems: 'center',
     marginBottom: 12,
     backgroundColor: '#fafafa',
   },
-  uploadedBox: { 
-    backgroundColor: '#f0fdf4', 
+  uploadedBox: {
+    backgroundColor: '#f0fdf4',
     borderColor: '#22c55e',
     borderStyle: 'solid',
   },
@@ -1169,7 +1175,7 @@ docBadge: {
     alignItems: 'center',
     marginBottom: 12,
   },
-  uploadTitle: { 
+  uploadTitle: {
     fontSize: 16,
     fontWeight: '600',
     color: '#111827',
@@ -1179,9 +1185,9 @@ docBadge: {
     fontSize: 13,
     color: '#6b7280',
   },
-  previewImage: { 
-    width: 120, 
-    height: 120, 
+  previewImage: {
+    width: 120,
+    height: 120,
     borderRadius: 12,
     marginBottom: 12,
   },
@@ -1190,18 +1196,18 @@ docBadge: {
     alignItems: 'center',
     gap: 6,
   },
-  uploadedText: { 
+  uploadedText: {
     color: '#16a34a',
     fontSize: 15,
     fontWeight: '600',
   },
-  
+
   // Payment Box
-  paymentBox: { 
-    backgroundColor: '#1e3a8a', 
-    borderRadius: 16, 
-    padding: 24, 
-    alignItems: 'center', 
+  paymentBox: {
+    backgroundColor: '#1e3a8a',
+    borderRadius: 16,
+    padding: 24,
+    alignItems: 'center',
     marginBottom: 16,
   },
   paymentHeader: {
@@ -1213,9 +1219,9 @@ docBadge: {
     fontSize: 14,
     marginTop: 6,
   },
-  paymentAmount: { 
-    color: 'white', 
-    fontSize: 48, 
+  paymentAmount: {
+    color: 'white',
+    fontSize: 48,
     fontWeight: '700',
     marginBottom: 16,
   },
@@ -1237,12 +1243,12 @@ docBadge: {
     color: 'rgba(255, 255, 255, 0.7)',
     fontSize: 12,
   },
-  paymentButton: { 
-    flexDirection: 'row', 
-    alignItems: 'center', 
-    justifyContent: 'center', 
-    backgroundColor: '#22c55e', 
-    borderRadius: 12, 
+  paymentButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#22c55e',
+    borderRadius: 12,
     paddingVertical: 16,
     gap: 10,
     shadowColor: '#22c55e',
@@ -1251,23 +1257,23 @@ docBadge: {
     shadowRadius: 8,
     elevation: 6,
   },
-  paymentButtonText: { 
-    color: 'white', 
-    fontSize: 16, 
+  paymentButtonText: {
+    color: 'white',
+    fontSize: 16,
     fontWeight: '700',
   },
-  
+
   // Navigation
-  navigation: { 
-    flexDirection: 'row', 
-    justifyContent: 'space-between', 
+  navigation: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
     marginTop: 12,
     gap: 12,
   },
-  backBtn: { 
-    flexDirection: 'row', 
-    alignItems: 'center', 
-    backgroundColor: '#f3f4f6', 
+  backBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#f3f4f6',
     paddingVertical: 14,
     paddingHorizontal: 20,
     borderRadius: 12,
@@ -1275,10 +1281,10 @@ docBadge: {
     flex: 1,
     justifyContent: 'center',
   },
-  nextBtn: { 
-    flexDirection: 'row', 
-    alignItems: 'center', 
-    backgroundColor: '#2563eb', 
+  nextBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#2563eb',
     paddingVertical: 14,
     paddingHorizontal: 20,
     borderRadius: 12,
@@ -1291,25 +1297,25 @@ docBadge: {
     shadowRadius: 8,
     elevation: 6,
   },
-  backText: { 
-    color: '#374151', 
+  backText: {
+    color: '#374151',
     fontWeight: '600',
     fontSize: 15,
   },
-  nextText: { 
-    color: 'white', 
+  nextText: {
+    color: 'white',
     fontWeight: '700',
     fontSize: 15,
   },
-  
+
   // Modal
-  modalContainer: { 
-    flex: 1, 
-    backgroundColor: 'rgba(0, 0, 0, 0.5)', 
+  modalContainer: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
     justifyContent: 'flex-end',
   },
-  modalBox: { 
-    backgroundColor: '#fff', 
+  modalBox: {
+    backgroundColor: '#fff',
     borderTopLeftRadius: 24,
     borderTopRightRadius: 24,
     padding: 20,
@@ -1324,26 +1330,26 @@ docBadge: {
     borderBottomWidth: 1,
     borderBottomColor: '#e5e7eb',
   },
-  modalTitle: { 
-    fontSize: 20, 
+  modalTitle: {
+    fontSize: 20,
     fontWeight: '700',
     color: '#111827',
   },
-  cityItem: { 
+  cityItem: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
     paddingVertical: 16,
     paddingHorizontal: 12,
-    borderBottomWidth: 1, 
+    borderBottomWidth: 1,
     borderBottomColor: '#f3f4f6',
     borderRadius: 8,
   },
   selectedCityItem: {
     backgroundColor: '#eff6ff',
   },
-  cityText: { 
-    fontSize: 16, 
+  cityText: {
+    fontSize: 16,
     color: '#374151',
   },
   selectedCityText: {
