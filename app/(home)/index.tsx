@@ -100,7 +100,7 @@ export default function HomeScreen() {
       await SecureStore.setItemAsync("acceptOrder", JSON.stringify(orderData));
       console.log("✅ Stored order data:", orderData);
 
-      // Navigate to order flow page
+      // Navigate to order flow page and pass order data
       router.push("/(orderFlow)");
     };
 

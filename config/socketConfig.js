@@ -33,7 +33,7 @@ export const connectRiderSocket = (riderId) => {
   });
 
   socket.on("orderUpdate", (order) => {
-    console.log('orderUpdated 📦📦📦📦📦' );
+    // console.log('orderUpdated 📦📦📦📦📦' );
     emitter.emit("orderUpdate", order);
   });
 

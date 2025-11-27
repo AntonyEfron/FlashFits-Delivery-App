@@ -90,9 +90,10 @@ const AnimatedEarningsCircle = ({ earnings }: { earnings: number }) => {
 };
 
 const DeliveryDetails = ({
-  onNext,
+  onNext, orderStatus
 }: {
   onNext: (route: "earnings" | "returnVerification") => void;
+  orderStatus: string;
 }) => {
   const [status, setStatus] = useState<DeliveryStatus>("pending");
   const [timeElapsed, setTimeElapsed] = useState(0);
@@ -141,7 +142,7 @@ const DeliveryDetails = ({
       setTimeElapsed((prev) => {
         if (prev + 1 >= TRY_DURATION) {
           clearInterval(timer);
-          handleTryPeriodEnd();
+          // handleTryPeriodEnd();
           return TRY_DURATION;
         }
         return prev + 1;
@@ -195,17 +196,17 @@ useEffect(() => {
     }
   };
 
-  const handleTryPeriodEnd = () => {
-    SecureStore.deleteItemAsync("status");
-    SecureStore.deleteItemAsync("startTime");
-    Alert.alert("Customer Decision", "Did the customer buy all the clothes?", [
-      { text: "Yes, all bought", onPress: () => onNext("earnings") },
-      {
-        text: "No, some returned",
-        onPress: () => onNext("returnVerification"),
-      },
-    ]);
-  };
+  // const handleTryPeriodEnd = () => {
+  //   SecureStore.deleteItemAsync("status");
+  //   SecureStore.deleteItemAsync("startTime");
+  //   Alert.alert("Customer Decision", "Did the customer buy all the clothes?", [
+  //     { text: "Yes, all bought", onPress: () => onNext("earnings") },
+  //     {
+  //       text: "No, some returned",
+  //       onPress: () => onNext("returnVerification"),
+  //     },
+  //   ]);
+  // };
 
   const handleMap = () => {
     const lat = orderData?.customerLocation?.lat || FALLBACK_LOCATION.lat;
@@ -348,7 +349,7 @@ useEffect(() => {
 
           <TouchableOpacity
             style={styles.buttonGreenLarge}
-            onPress={handleTryPeriodEnd}
+            // onPress={handleTryPeriodEnd}
             activeOpacity={0.8}
           >
             <View style={styles.waitingButtonContent}>

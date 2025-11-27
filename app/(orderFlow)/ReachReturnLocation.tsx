@@ -1,11 +1,48 @@
 import React from "react";
-import { View, Text, TouchableOpacity, StyleSheet } from "react-native";
+import {
+  View,
+  Text,
+  TouchableOpacity,
+  StyleSheet,
+  Linking,
+  Alert,
+} from "react-native";
 
 type Props = {
   onNext: () => void;
+  order: any;
 };
 
-export default function ReachReturnLocation({ onNext }: Props) {
+export default function ReachReturnLocation({ onNext, order }: Props) {
+  const coordinates = order?.pickupCoordinates;
+  console.log(order, "order");
+
+  console.log(coordinates, "coordinates");
+
+  const handleOpenInGoogleMaps = () => {
+    console.log("🚀 ~ ReachReturnLocation ~ coordinates:", coordinates);
+    if (!coordinates?.latitude || !coordinates?.longitude) {
+      Alert.alert("Error", "Coordinates not available.");
+      return;
+    }
+
+    const lat = coordinates.latitude;
+    const lng = coordinates.longitude;
+
+    // Google Maps link
+    const url = `https://www.google.com/maps?q=${lat},${lng}`;
+
+    Linking.canOpenURL(url)
+      .then((supported) => {
+        if (supported) {
+          Linking.openURL(url);
+        } else {
+          Alert.alert("Error", "Unable to open Google Maps.");
+        }
+      })
+      .catch(() => Alert.alert("Error", "Failed to open Google Maps."));
+  };
+
   return (
     <View style={styles.root}>
       {/* Map or placeholder */}
@@ -13,7 +50,9 @@ export default function ReachReturnLocation({ onNext }: Props) {
 
       {/* Route instruction text */}
       <View style={styles.routeInstructionContainer}>
-        <Text style={styles.routeInstructionText}>Take the route to return location</Text>
+        <Text style={styles.routeInstructionText}>
+          Take the route to return location
+        </Text>
       </View>
 
       {/* Bottom sheet */}
@@ -22,13 +61,22 @@ export default function ReachReturnLocation({ onNext }: Props) {
 
         <View style={styles.addressRow}>
           <View>
-            <Text style={styles.addressTitle}>
-              Warehouse Hub
+            <Text style={styles.addressTitle}>Warehouse Hub</Text>
+            <Text style={styles.addressDetails}>
+              456 Industrial Park, Sector 5
             </Text>
-            <Text style={styles.addressDetails}>456 Industrial Park, Sector 5</Text>
           </View>
         </View>
 
+        {/* ✅ Open in Google Maps Button */}
+        <TouchableOpacity
+          style={[styles.button, { backgroundColor: "#2563EB" }]}
+          onPress={handleOpenInGoogleMaps}
+        >
+          <Text style={styles.buttonText}>Open in Google Maps</Text>
+        </TouchableOpacity>
+
+        {/* ✅ Next Step Button */}
         <TouchableOpacity style={styles.button} onPress={onNext}>
           <Text style={styles.buttonText}>Return Location Reached</Text>
         </TouchableOpacity>
@@ -38,91 +86,65 @@ export default function ReachReturnLocation({ onNext }: Props) {
 }
 
 const styles = StyleSheet.create({
-  root: { flex: 1, backgroundColor: '#f1f5f9' },
+  root: {
+    flex: 1,
+    backgroundColor: "#F8FAFC",
+  },
   mapContainer: {
     flex: 1,
-    backgroundColor: '#dbeafe',
+    backgroundColor: "#E2E8F0",
   },
   routeInstructionContainer: {
-    position: 'absolute',
-    bottom: 200,
-    left: 0,
-    right: 0,
-    alignItems: 'center',
-    paddingHorizontal: 24,
+    padding: 16,
+    backgroundColor: "#fff",
+    borderBottomWidth: 1,
+    borderColor: "#E5E7EB",
   },
   routeInstructionText: {
-    backgroundColor: '#fff',
-    color: '#111827',
     fontSize: 16,
-    fontWeight: '600',
-    paddingVertical: 12,
-    paddingHorizontal: 20,
-    borderRadius: 12,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 8,
-    elevation: 4,
+    color: "#1E293B",
+    fontWeight: "500",
   },
   sheet: {
-    position: 'absolute',
-    bottom: 0,
-    left: 0,
-    right: 0,
-    backgroundColor: '#fff',
-    borderTopLeftRadius: 22,
-    borderTopRightRadius: 22,
-    padding: 24,
-    elevation: 16,
-    shadowColor: '#000',
+    padding: 20,
+    backgroundColor: "#fff",
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    shadowColor: "#000",
     shadowOffset: { width: 0, height: -2 },
-    shadowOpacity: 0.12,
-    shadowRadius: 12,
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 4,
   },
   locationLabel: {
-    color: '#949494',
-    fontWeight: '600',
-    fontSize: 12,
-    letterSpacing: 1,
-    marginBottom: 10,
+    fontSize: 14,
+    fontWeight: "bold",
+    color: "#64748B",
+    marginBottom: 8,
   },
   addressRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'flex-start',
-    marginBottom: 30,
+    marginBottom: 20,
   },
   addressTitle: {
-    color: '#111827',
-    fontFamily: 'System',
-    fontWeight: '700',
     fontSize: 18,
-    marginBottom: 2,
+    fontWeight: "600",
+    color: "#111827",
   },
   addressDetails: {
-    color: '#555',
-    fontFamily: 'System',
     fontSize: 14,
-    width: 240,
+    color: "#475569",
+    marginTop: 2,
   },
   button: {
-    backgroundColor: '#ff5035',
-    paddingVertical: 16,
+    backgroundColor: "#10B981",
     borderRadius: 12,
-    marginTop: 0,
-    width: '100%',
-    alignSelf: 'center',
-    shadowColor: '#ee6e46',
-    shadowOffset: { width: 0, height: 3 },
-    shadowOpacity: 0.2,
-    shadowRadius: 6,
+    paddingVertical: 16,
+    alignItems: "center",
+    marginTop: 12,
   },
   buttonText: {
-    color: '#fff',
-    fontWeight: '700',
+    color: "#fff",
     fontSize: 16,
-    textAlign: 'center',
-    letterSpacing: 0.5,
+    fontWeight: "bold",
   },
 });

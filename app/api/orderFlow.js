@@ -87,3 +87,21 @@ export const HandoverPackageApi = async ({ orderId }) => {
     throw error;
   }
 };
+
+export const ReturnVerificationApi = async ({ orderId, otp }) => {
+  try {
+    const response = await axiosInstance.post("/deliveryRider/order/returnVerification", {
+      orderId,
+      otp,
+    });
+
+    console.log("✅ Return verification logged:", response.data);
+    return response.data;
+  } catch (error) {
+    console.error(
+      "❌ Error marking return verification:",
+      error.response?.data || error.message
+    );
+    throw error;
+  }
+};

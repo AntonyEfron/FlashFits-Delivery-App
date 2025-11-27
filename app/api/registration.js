@@ -44,3 +44,13 @@ export const submitBankDetails = async (bankData) => {
     throw error.response?.data || error;
   }
 };
+
+export const getZones = async()=>{
+  try {
+    const response = await axiosInstance.get("/admin/zone");
+    return response.data;
+  } catch (error) {
+    console.error("Error submitting bank details:", error.response?.data || error.message);
+    throw error.response?.data || error;
+  }
+}
