@@ -45,6 +45,7 @@ const DeliveryPartnerEnrollment = () => {
   const [city, setCity] = useState('');
   const [area, setArea] = useState('');
   const [selectedZone, setSelectedZone] = useState('');
+  const [selectedZoneName, setSelectedZoneName] = useState('');
   const [zones, setZones] = useState<any[]>([]);
   const [showAreaDropdown, setShowAreaDropdown] = useState(false);
   const [showCityDropdown, setShowCityDropdown] = useState(false);
@@ -134,7 +135,8 @@ const DeliveryPartnerEnrollment = () => {
         gender,
         email,
         city,
-        zone: selectedZone,
+        zoneId: selectedZone,
+        zoneName: selectedZoneName,
         pincode,
       };
       try {
@@ -496,6 +498,7 @@ const DeliveryPartnerEnrollment = () => {
                     style={[styles.cityItem, selectedZone === item._id && styles.selectedCityItem]}
                     onPress={() => {
                       setSelectedZone(item._id);
+                      setSelectedZoneName(item.zoneName);
                       setShowAreaDropdown(false);
                     }}
                   >

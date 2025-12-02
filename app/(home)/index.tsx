@@ -78,18 +78,19 @@ export default function HomeScreen() {
       console.log("✅ Payload order data:", payload);
 
       // Extract only pickup and delivery amount safely
-      const orderData = {
-        orderId: payload?._doc?._id,
-        pickupLocationCorrdinates: payload?.pickupLocation || "null",
-        pickupAddress: payload._doc?.address || "null",
-        deliveryAmount: payload?.deliveryAmount || 0,
-        shopName: payload?._doc?.merchantId?.shopName || "Unknown Shop",
-        items: payload?._doc?.items,
-        deliveryDistance: payload?._doc?.deliveryDistance,
-        customerLocation: payload?.customerLocation,
-        cutomerAddress: payload?._doc?.cutomerAddress || "null",
-        deliveryCharge: payload?._doc?.deliveryCharge || 0,
-      };
+     const orderData = {
+  orderId: payload?._id,
+  pickupLocationCorrdinates: payload?.pickupLocation,
+  pickupAddress: payload?.address,
+  deliveryAmount: payload?.deliveryAmount,
+  shopName: payload?.merchantId?.shopName || "Unknown Shop",
+  items: payload?.items,
+  deliveryDistance: payload?.deliveryDistance,
+  customerLocation: payload?.customerLocation,
+  cutomerAddress: payload?.cutomerAddress,
+  deliveryCharge: payload?.deliveryCharge,
+};
+
 
       const status = await SecureStore.getItemAsync("status");
 
