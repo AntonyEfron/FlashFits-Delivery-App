@@ -32,8 +32,6 @@ const bankNames = [
   "Union Bank of India",
 ];
 
-
-
 const DeliveryPartnerEnrollment = () => {
   const [step, setStep] = useState(1);
   const [fullName, setFullName] = useState('');
