@@ -8,7 +8,7 @@ import { getRider } from "./api/auth";
 export default function Index() {
   const { hasPermission, locationEnabled } = useLocationPermission();
   const [isLoading, setIsLoading] = useState(true);
-  const [redirectPath, setRedirectPath] = useState< 
+  const [redirectPath, setRedirectPath] = useState<
     "/(home)" | "/(auth)" | "/(register)" | "/(orderFlow)" | null
   >(null);
 
@@ -23,28 +23,25 @@ export default function Index() {
           setRedirectPath("/(auth)");
           setIsLoading(false);
           return;
-        }
-        // Fetch rider details
-        const res = await getRider();
-        console.log(res,'RODER');
-        const rider = res.deliveryRider;
+        } else {
+          const res = await getRider();
+          console.log(res, 'RODER');
+          const rider = res.deliveryRider;
+          console.log("Verified:", rider.isVerified);
+          console.log("Current Order:", rider.currentOrderId);
 
-        console.log("Verified:", rider.isVerified);
-        console.log("Current Order:", rider.currentOrderId);
-
-        // If rider has an active order → go to orderFlow immediately
-        if (rider.currentOrderId) {
-          setRedirectPath("/(orderFlow)");
+          // If rider has an active order → go to orderFlow immediately
+          if (rider.currentOrderId) {
+            setRedirectPath("/(orderFlow)");
+          }
+          // If not verified → go to register
+          else if (!rider.isVerified) {
+            setRedirectPath("/(register)");
+          }
+          else {
+            setRedirectPath("/(home)");
+          }
         }
-        // If not verified → go to register
-        else if (!rider.isVerified) {
-          setRedirectPath("/(register)");
-        }
-        // Else → home
-        else {
-          setRedirectPath("/(home)");
-        }
-
       } catch (error) {
         console.error("Auth check error:", error);
         setRedirectPath("/(auth)");
