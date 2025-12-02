@@ -2,8 +2,9 @@
 import io from "socket.io-client/dist/socket.io";
 import mitt from "mitt";
 import Constants from "expo-constants";
-
+import * as SecureStore from "expo-secure-store";
 let socket = null;
+let currentOrderId = null;
 export const emitter = mitt();
 export const connectRiderSocket = (riderId) => {
   if (socket && socket.connected) {
@@ -26,21 +27,39 @@ export const connectRiderSocket = (riderId) => {
     console.log("❌ Rider disconnected from socket");
   });
 
-  socket.on("orderAssigned", ({ orderId, orderPayload }) => {
-    console.log("📦 Order assigned:", orderPayload);
-    emitter.emit("orderAssigned", orderPayload);
-    // router.push("/(orderFlow)");
-  });
+// When rider gets assigned an order — SAVE IT
+socket.on("orderAssigned", async ({ orderId, orderPayload }) => {
+  console.log("Order assigned:", orderPayload);
+  
+  currentOrderId = orderId;
+  
+  // SAVE TO SECURESTORE SO IT SURVIVES REFRESH
+  await SecureStore.setItemAsync("currentOrderId", orderId);
+  
+  emitter.emit("orderAssigned", orderPayload);
+  
+  socket.emit("joinOrderRoom", orderId);
+  console.log("Joined order room:", orderId);
+});
 
   socket.on("orderUpdate", (order) => {
     // console.log('orderUpdated 📦📦📦📦📦' );
     emitter.emit("orderUpdate", order);
   });
 
-  socket.on("reconnect", () => {
-    console.log("🔄 Reconnected to server");
-    socket.emit("registerRider", { riderId });
-  });
+// Re-join on reconnect
+socket.on("reconnect", async () => {
+  console.log("Reconnected to server");
+  socket.emit("registerRider", { riderId });
+
+  // GET FROM SECURESTORE
+  const savedOrderId = await SecureStore.getItemAsync("currentOrderId");
+  if (savedOrderId) {
+    currentOrderId = savedOrderId;
+    console.log("Re-joining saved order:", savedOrderId);
+    socket.emit("joinOrderRoom", savedOrderId);
+  }
+});
 
   return socket;
 };
@@ -70,4 +89,9 @@ export const joinOrderRoom = (orderId: string) => {
   } else {
     console.error("❌ Cannot join order room: Socket not connected");
   }
+};
+
+export const clearCurrentOrder = async () => {
+  currentOrderId = null;
+  await SecureStore.deleteItemAsync("currentOrderId");
 };

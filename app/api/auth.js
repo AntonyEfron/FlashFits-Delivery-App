@@ -20,6 +20,7 @@
             console.log(response.data);
             return response;
         } catch (error) {
+            console.log(error);
             throw error;
         }
     };

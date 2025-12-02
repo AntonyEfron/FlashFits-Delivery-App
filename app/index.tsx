@@ -1,3 +1,4 @@
+//index.tsx
 import { useEffect, useState } from "react";
 import { Redirect } from "expo-router";
 import * as SecureStore from "expo-secure-store";
@@ -16,7 +17,8 @@ export default function Index() {
     const checkAuth = async () => {
       try {
         const token = await SecureStore.getItemAsync("token");
-
+        console.log(token, "token");
+        
         // No token → go to login
         if (!token) {
           // console.log('notokern');
