@@ -70,10 +70,10 @@ const ReachPickup: React.FC<ReachPickupProps> = ({ onNext }) => {
 
       console.log("📏 Distance to pickup:", distance.toFixed(2), "meters");
 
-      if (distance > 100) {
-        Alert.alert("Too Far", `You are ${distance.toFixed(0)} meters away from pickup location.`);
-        return;
-      }
+      // if (distance > 100) {
+      // //   Alert.alert("Too Far", `You are ${distance.toFixed(0)} meters away from pickup location.`);
+      // //   return;
+      // // }
 
       const result = await ReachPickUpLocation({ orderId, coordinates: pickupCoords });
       if (result) {

@@ -28,6 +28,14 @@ export const startLocationTracking = async (riderId) => {
   console.log("✅ Location tracking started");
 };
 
+export const stopLocationTracking = async () => {
+  if (locationSubscription) {
+    locationSubscription.remove();
+    locationSubscription = null;
+    console.log("🛑 Location tracking stopped");
+  }
+};
+
 export const ReachPickUpLocation = async ({ orderId, coordinates }) => {
   try {
     const response = await axiosInstance.post("/deliveryRider/order/reachPickupLocation", {

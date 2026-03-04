@@ -77,10 +77,12 @@ const AcceptOrder: React.FC<AcceptOrderProps> = ({ onNext }) => {
   useEffect(() => {
     const loadOrder = async () => {
       const storedOrder = await SecureStore.getItemAsync("acceptOrder");
+      
       if (storedOrder) {
         const parsedOrder = JSON.parse(storedOrder);
         console.log("📦 Loaded order data from SecureStore:", parsedOrder);
         setOrder(parsedOrder);
+        await SecureStore.setItemAsync("currentOrderId", parsedOrder.orderId);
       }
     };
     loadOrder();

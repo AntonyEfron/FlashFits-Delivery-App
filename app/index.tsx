@@ -27,8 +27,8 @@ export default function Index() {
           return;
         } else {
           const res = await getRider();
-          console.log(res, 'RODER');
-          const rider = res.deliveryRider;
+          console.log(res.rider, 'RODER');
+          const rider = res.rider
           console.log("Verified:", rider.isVerified);
           console.log("Current Order:", rider.currentOrderId);
 

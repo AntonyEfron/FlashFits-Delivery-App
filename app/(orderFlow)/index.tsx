@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useMemo, useCallback } from "react";
 import { useRouter, useLocalSearchParams } from "expo-router";
 import AcceptOrder from "./AcceptOrder";
 import ReachPickup from "./ReachPickup";
@@ -12,59 +12,56 @@ import MerchantReturnVerification from "./MerchantReturnVerification";
 import { emitter } from "../../config/socketConfig";
 import ReturnItemCamera from "./ReturnItemCamera";
 
+/**
+ * OrderFlow — Renders only the current step instead of mounting all 10 screens.
+ * Uses useMemo + useCallback to prevent re-renders.
+ */
 const OrderFlow: React.FC = () => {
-  // const { order } = useLocalSearchParams();
   const router = useRouter();
   const { step } = useLocalSearchParams();
   const [currentStep, setCurrentStep] = useState<number>(parseInt(step as string) || 0);
-
-  const handleDeliveryNext = (route: "earnings" | "returnVerification") => {
-    if (route === "earnings") setCurrentStep(9);
-    else setCurrentStep(5);
-  };
-
   const [order, setOrder] = useState<any>(null);
 
-  const screens = [
-    <AcceptOrder key="accept" onNext={() => setCurrentStep(1)} />,
-    <ReachPickup key="reachPickup" onNext={() => setCurrentStep(2)} />,
-    <PickupDetails key="pickupDetails" onNext={() => setCurrentStep(3)} />,
-    <ReachDeliveryLocation key="reachDelivery" onNext={() => setCurrentStep(4)} />,
-    <DeliveryDetails key="deliveryDetails" onNext={handleDeliveryNext} orderStatus={order?.orderStatus} />,
-    <ReturnVerification key="returnVerify" onNext={() => setCurrentStep(6)} orderId={order?._id} />,
-    <ReturnItemCamera key="returnCamera" onNext={() => setCurrentStep(7)} orderId={order?._id} />,
-    <ReachReturnLocation key="reachReturn" onNext={() => setCurrentStep(8)} order={order} />,
-    <MerchantReturnVerification key="merchantVerify" onNext={() => setCurrentStep(9)} />,
-    <EarningsSummary key="earnings" onFinish={() => router.push("/(home)")} />,
-  ];
+  // Memoized callbacks to prevent child re-renders
+  const goToStep = useCallback((s: number) => () => setCurrentStep(s), []);
+  const handleDeliveryNext = useCallback((route: "earnings" | "returnVerification") => {
+    setCurrentStep(route === "earnings" ? 9 : 5);
+  }, []);
+  const handleFinish = useCallback(() => router.push("/(home)"), [router]);
 
-  // ✅ Listen for "orderAssigned" socket event
+  // Listen for order updates via socket
   useEffect(() => {
     const handleOrder = (payload: any) => {
-
-      console.log("📦 Received order on screen:", payload);
-      if(payload.orderStatus === "completed try phase") {
+      if (payload.orderStatus === "completed try phase") {
         setCurrentStep(5);
-      }
-      else if(payload.orderStatus === "complete") {
+      } else if (payload.orderStatus === "completed") {
         setCurrentStep(9);
       }
-     
       setOrder(payload);
-      
-
-      // Navigate to OrderFlow
-      // router.push("/(orderFlow)"); // adjust route if needed
     };
 
     emitter.on("orderUpdate", handleOrder);
-
-    return () => {
-      emitter.off("orderUpdate", handleOrder);
-    };
+    return () => { emitter.off("orderUpdate", handleOrder); };
   }, []);
 
-  return <>{screens[currentStep]}</>;
+  // Render ONLY the current screen — no wasted mounts
+  const currentScreen = useMemo(() => {
+    switch (currentStep) {
+      case 0: return <AcceptOrder key="accept" onNext={goToStep(1)} />;
+      case 1: return <ReachPickup key="reachPickup" onNext={goToStep(2)} />;
+      case 2: return <PickupDetails key="pickupDetails" onNext={goToStep(3)} />;
+      case 3: return <ReachDeliveryLocation key="reachDelivery" onNext={goToStep(4)} />;
+      case 4: return <DeliveryDetails key="deliveryDetails" onNext={handleDeliveryNext} orderStatus={order?.orderStatus} />;
+      case 5: return <ReturnVerification key="returnVerify" onNext={goToStep(6)} orderId={order?._id} />;
+      case 6: return <ReturnItemCamera key="returnCamera" onNext={goToStep(7)} orderId={order?._id} />;
+      case 7: return <ReachReturnLocation key="reachReturn" onNext={goToStep(8)} order={order} />;
+      case 8: return <MerchantReturnVerification key="merchantVerify" onNext={goToStep(9)} order={order} />;
+      case 9: return <EarningsSummary key="earnings" onFinish={handleFinish} order={order} />;
+      default: return <AcceptOrder key="accept" onNext={goToStep(1)} />;
+    }
+  }, [currentStep, order, goToStep, handleDeliveryNext, handleFinish]);
+
+  return <>{currentScreen}</>;
 };
 
 export default OrderFlow;

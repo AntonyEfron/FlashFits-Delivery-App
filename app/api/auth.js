@@ -17,8 +17,8 @@
     export const getRider = async () => {
         try {
             const response = await axiosInstance.get("/deliveryRider/getRiderById");
-            console.log(response.data);
-            return response;
+            // console.log(response.data);
+            return response.data;
         } catch (error) {
             console.log(error);
             throw error;
