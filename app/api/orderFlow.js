@@ -83,7 +83,19 @@ export const ReachedReturnMerchantApi = async ({ orderId, latitude, longitude })
 // Verify the return OTP given by the merchant
 export const ReturnVerificationApi = async ({ orderId, otp }) => {
   try {
-    const response = await axiosInstance.post("/deliveryRider/order/returnVerification", {
+    const response = await axiosInstance.post("/deliveryRider/order/verifyOtpOnReturn", {
+      orderId, otp,
+    });
+    return response.data;
+  } catch (error) {
+    console.error("❌ ReturnVerificationApi:", error.response?.data || error.message);
+    throw error;
+  }
+};
+
+export const returnItemsToMerchantApi = async ({ orderId, otp }) => {
+  try {
+    const response = await axiosInstance.post("/deliveryRider/order/returnMerchantOtpVerification", {
       orderId, otp,
     });
     return response.data;

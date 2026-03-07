@@ -34,13 +34,15 @@ const OrderFlow: React.FC = () => {
     const handleOrder = (payload: any) => {
       if (payload.orderStatus === "completed try phase") {
         setCurrentStep(5);
-      } else if (payload.orderStatus === "completed") {
+      } else if (payload.deliveryRiderStatus === "completed") {
         setCurrentStep(9);
       }
       setOrder(payload);
     };
 
-    emitter.on("orderUpdate", handleOrder);
+    emitter.on("orderUpdate", (payload) => {
+      handleOrder(payload)
+    });
     return () => { emitter.off("orderUpdate", handleOrder); };
   }, []);
 

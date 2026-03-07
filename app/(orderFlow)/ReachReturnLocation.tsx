@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useState } from "react";
 import {
   View,
   Text,
@@ -6,7 +6,11 @@ import {
   StyleSheet,
   Linking,
   Alert,
+  ActivityIndicator,
 } from "react-native";
+import { getCurrentLocation } from "../../utils/updateLocation";
+import { ReachedReturnMerchantApi } from "../api/orderFlow";
+import * as SecureStore from "expo-secure-store";
 
 type Props = {
   onNext: () => void;
@@ -14,20 +18,21 @@ type Props = {
 };
 
 export default function ReachReturnLocation({ onNext, order }: Props) {
-  const coordinates = order?.pickupCoordinates;
+  const [loading, setLoading] = useState(false);
+  const coordinates = order?.pickupLocation?.coordinates;
   console.log(order, "order");
 
   console.log(coordinates, "coordinates");
 
   const handleOpenInGoogleMaps = () => {
     console.log("🚀 ~ ReachReturnLocation ~ coordinates:", coordinates);
-    if (!coordinates?.latitude || !coordinates?.longitude) {
+    if (!coordinates || coordinates.length < 2) {
       Alert.alert("Error", "Coordinates not available.");
       return;
     }
 
-    const lat = coordinates.latitude;
-    const lng = coordinates.longitude;
+    const lat = coordinates[1];
+    const lng = coordinates[0];
 
     // Google Maps link
     const url = `https://www.google.com/maps?q=${lat},${lng}`;
@@ -41,6 +46,81 @@ export default function ReachReturnLocation({ onNext, order }: Props) {
         }
       })
       .catch(() => Alert.alert("Error", "Failed to open Google Maps."));
+  };
+
+  /** 🌍 Distance calculator (Haversine formula) */
+  const getDistanceFromLatLonInMeters = (lat1: number, lon1: number, lat2: number, lon2: number) => {
+    const R = 6371000;
+    const dLat = ((lat2 - lat1) * Math.PI) / 180;
+    const dLon = ((lon2 - lon1) * Math.PI) / 180;
+    const a =
+      Math.sin(dLat / 2) ** 2 +
+      Math.cos((lat1 * Math.PI) / 180) *
+      Math.cos((lat2 * Math.PI) / 180) *
+      Math.sin(dLon / 2) ** 2;
+    return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+  };
+
+  const handleReachLocation = async () => {
+    try {
+      if (!coordinates || coordinates.length < 2) {
+        Alert.alert("Error", "Return location coordinates not available.");
+        return;
+      }
+
+      setLoading(true);
+      const currentLoc = await getCurrentLocation();
+
+      if (!currentLoc) {
+        Alert.alert("Location Error", "Unable to get your current location.");
+        setLoading(false);
+        return;
+      }
+
+      const returnLat = coordinates[1];
+      const returnLng = coordinates[0];
+
+      const distance = getDistanceFromLatLonInMeters(
+        currentLoc.latitude,
+        currentLoc.longitude,
+        returnLat,
+        returnLng
+      );
+
+      console.log("📏 Distance to return location:", distance.toFixed(2), "meters");
+
+      // Optional: enforce distance threshold
+      // if (distance > 100) {
+      //   Alert.alert("Too Far", `You are ${distance.toFixed(0)} meters away from the return location.`);
+      //   setLoading(false);
+      //   return;
+      // }
+
+      const orderId = order?._id || order?.orderId;
+      if (!orderId) {
+        Alert.alert("Error", "Order ID is missing.");
+        setLoading(false);
+        return;
+      }
+
+      // Call API
+      const result = await ReachedReturnMerchantApi({
+        orderId,
+        latitude: currentLoc.latitude,
+        longitude: currentLoc.longitude,
+      });
+
+      if (result) {
+        await SecureStore.setItemAsync("orderStep", JSON.stringify("8"));
+        Alert.alert("Success", "Reached return location confirmed.");
+        onNext();
+      }
+    } catch (error) {
+      console.error("❌ Error in handleReachLocation:", error);
+      Alert.alert("Error", "Failed to update location.");
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -77,8 +157,16 @@ export default function ReachReturnLocation({ onNext, order }: Props) {
         </TouchableOpacity>
 
         {/* ✅ Next Step Button */}
-        <TouchableOpacity style={styles.button} onPress={onNext}>
-          <Text style={styles.buttonText}>Return Location Reached</Text>
+        <TouchableOpacity
+          style={[styles.button, loading && { opacity: 0.7 }]}
+          onPress={handleReachLocation}
+          disabled={loading}
+        >
+          {loading ? (
+            <ActivityIndicator color="#fff" />
+          ) : (
+            <Text style={styles.buttonText}>Return Location Reached</Text>
+          )}
         </TouchableOpacity>
       </View>
     </View>

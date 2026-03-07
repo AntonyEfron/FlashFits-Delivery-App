@@ -69,10 +69,16 @@ export default function MerchantReturnVerification({ onNext, order }) {
     setLoading(true);
     setError(null);
     try {
-      await ReturnVerificationApi({ orderId, otp: otp.trim() });
-      setStep('done');
-      // Small delay for UX, then proceed to earnings
-      setTimeout(() => onNext(), 1200);
+      const response = await ReturnVerificationApi({ orderId, otp: otp.trim() });
+      console.log(response);
+      
+      if (response && response.message === "OTP verified successfully") {
+        setStep('done');
+        // Small delay for UX, then proceed to earnings
+        setTimeout(() => onNext(), 1200);
+      } else {
+        setError(response?.message || 'OTP verification failed');
+      }
     } catch (err) {
       const msg = err?.response?.data?.message || err?.message || 'OTP verification failed';
       setError(msg);

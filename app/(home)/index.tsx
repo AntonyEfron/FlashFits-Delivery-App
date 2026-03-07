@@ -22,19 +22,33 @@ export default function HomeScreen() {
   const [riderId, setRiderId] = useState<string | null>(null);
   const [isOnline, setIsOnline] = useState(false);
 
-  // ✅ Fetch riderId once
+  // ✅ Fetch riderId once and check online status
   useEffect(() => {
-    const fetchRiderId = async () => {
+    const fetchInitialData = async () => {
       const id = await SecureStore.getItemAsync("deliveryRiderId");
       console.log("🆔 Rider ID:", id);
       setRiderId(id);
+
+      const savedOnlineStatus = await SecureStore.getItemAsync("isOnline");
+      if (savedOnlineStatus === "true") {
+        setIsOnline(true);
+        // If they left the app while online, make sure socket connects
+        if (id) {
+          console.log("🟢 Reconnecting socket for rider:", id);
+          connectRiderSocket(id);
+          startLocationTracking(id);
+        }
+      }
     };
-    fetchRiderId();
+    fetchInitialData();
   }, []);
 
   // ✅ Handle Go Online / Offline
   const handleToggleOnline = async (status: boolean) => {
+    if (status === isOnline) return; // Prevent unnecessary toggles
+
     setIsOnline(status);
+    await SecureStore.setItemAsync("isOnline", status ? "true" : "false");
 
     if (status) {
       const { status: permStatus } =
@@ -46,6 +60,7 @@ export default function HomeScreen() {
           "You must allow location access to go online."
         );
         setIsOnline(false);
+        await SecureStore.setItemAsync("isOnline", "false");
         return;
       }
 
@@ -55,6 +70,7 @@ export default function HomeScreen() {
           { text: "Open Settings", onPress: () => Linking.openSettings() },
         ]);
         setIsOnline(false);
+        await SecureStore.setItemAsync("isOnline", "false");
         return;
       }
 
@@ -78,18 +94,18 @@ export default function HomeScreen() {
       console.log("✅ Payload order data:", payload);
 
       // Extract only pickup and delivery amount safely
-     const orderData = {
-  orderId: payload?._id,
-  pickupLocationCorrdinates: payload?.pickupLocation,
-  pickupAddress: payload?.address,
-  deliveryAmount: payload?.deliveryAmount,
-  shopName: payload?.merchantId?.shopName || "Unknown Shop",
-  items: payload?.items,
-  deliveryDistance: payload?.deliveryDistance,
-  customerLocation: payload?.customerLocation,
-  cutomerAddress: payload?.cutomerAddress,
-  deliveryCharge: payload?.deliveryCharge,
-};
+      const orderData = {
+        orderId: payload?._id,
+        pickupLocationCorrdinates: payload?.pickupLocation,
+        pickupAddress: payload?.address,
+        deliveryAmount: payload?.deliveryAmount,
+        shopName: payload?.merchantId?.shopName || "Unknown Shop",
+        items: payload?.items,
+        deliveryDistance: payload?.deliveryDistance,
+        customerLocation: payload?.customerLocation,
+        cutomerAddress: payload?.cutomerAddress,
+        deliveryCharge: payload?.deliveryCharge,
+      };
 
 
       const status = await SecureStore.getItemAsync("status");
