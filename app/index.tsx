@@ -4,6 +4,7 @@ import { Redirect } from "expo-router";
 import * as SecureStore from "expo-secure-store";
 import { ActivityIndicator, View, Text } from "react-native";
 import { useLocationPermission } from "../hooks/useLocationPermission";
+import { usePushNotifications } from "../hooks/usePushNotifications";
 import { getRider } from "./api/auth";
 
 export default function Index() {
@@ -12,6 +13,8 @@ export default function Index() {
   const [redirectPath, setRedirectPath] = useState<
     "/(home)" | "/(auth)" | "/(register)" | "/(orderFlow)" | null
   >(null);
+
+  const { expoPushToken, sendPushTokenToBackend } = usePushNotifications();
 
   useEffect(() => {
     const checkAuth = async () => {
@@ -27,6 +30,10 @@ export default function Index() {
           return;
         } else {
           const res = await getRider();
+          if (res && expoPushToken) {
+            // Send token to backend if the user is authenticated 
+            await sendPushTokenToBackend(expoPushToken);
+          }
           console.log(res.rider, 'RODER');
           const rider = res.rider
           console.log("Verified:", rider.isVerified);

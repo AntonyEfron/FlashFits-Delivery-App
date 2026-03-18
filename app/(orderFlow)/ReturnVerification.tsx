@@ -13,7 +13,7 @@ import {
 } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
 import { MaterialCommunityIcons, Ionicons } from '@expo/vector-icons';
-import { returnItemsToMerchantApi } from '../api/orderFlow';
+import { ReturnItemVerificationApi, ReturnVerificationApi } from '../api/orderFlow';
 
 interface ReturnVerificationProps {
   onNext: () => void;
@@ -48,7 +48,7 @@ const ReturnVerification: React.FC<ReturnVerificationProps> = ({ onNext, orderId
       return;
     }
     try {
-      const response = await returnItemsToMerchantApi({ orderId: orderId, otp });
+      const response = await ReturnItemVerificationApi({ orderId: orderId, otp });
       console.log('Return verification response:', response);
     } catch (error) {
       console.error('Error verifying return:', error);

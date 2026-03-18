@@ -30,8 +30,11 @@ const ReachPickup: React.FC<ReachPickupProps> = ({ onNext }) => {
     fetchOrder();
   }, []);
 
-  /** 🧭 Static pickup coordinates */
-  const pickupCoords = { lat: 9.9675883, lng: 76.2994220 };
+  /** 🧭 Dynamic pickup coordinates */
+  const pickupCoords = { 
+    lat: orderData?.pickupLocationCorrdinates?.coordinates?.[1] || 9.9675883, 
+    lng: orderData?.pickupLocationCorrdinates?.coordinates?.[0] || 76.2994220 
+  };
 
   /** 🌍 Distance calculator (Haversine formula) */
   const getDistanceFromLatLonInMeters = (lat1: number, lon1: number, lat2: number, lon2: number) => {
@@ -70,10 +73,10 @@ const ReachPickup: React.FC<ReachPickupProps> = ({ onNext }) => {
 
       console.log("📏 Distance to pickup:", distance.toFixed(2), "meters");
 
-      // if (distance > 100) {
-      // //   Alert.alert("Too Far", `You are ${distance.toFixed(0)} meters away from pickup location.`);
-      // //   return;
-      // // }
+      if (distance > 70) {
+        Alert.alert("Too Far", `You are ${distance.toFixed(0)} meters away from pickup location.\nYou must be within 70 meters.`, [{ text: "OK" }]);
+        return;
+      }
 
       const result = await ReachPickUpLocation({ orderId, coordinates: pickupCoords });
       if (result) {

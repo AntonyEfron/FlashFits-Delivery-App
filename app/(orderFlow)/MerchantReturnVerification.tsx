@@ -14,7 +14,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { ReachedReturnMerchantApi, ReturnVerificationApi } from '../api/orderFlow';
 import * as Location from 'expo-location';
-import { joinOrderRoom, listenOrderUpdates, removeOrderListeners } from '@/app/sockets/order.socket';
+// import { joinOrderRoom, listenOrderUpdates, removeOrderListeners } from '@/app/sockets/order.socket';
 
 /**
  * MerchantReturnVerification
@@ -72,7 +72,7 @@ export default function MerchantReturnVerification({ onNext, order }) {
       const response = await ReturnVerificationApi({ orderId, otp: otp.trim() });
       console.log(response);
       
-      if (response && response.message === "OTP verified successfully") {
+      if (response && response.message === "Return OTP verified. Order complete.") {
         setStep('done');
         // Small delay for UX, then proceed to earnings
         setTimeout(() => onNext(), 1200);

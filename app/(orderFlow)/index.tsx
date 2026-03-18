@@ -1,5 +1,6 @@
 import React, { useEffect, useState, useMemo, useCallback } from "react";
 import { useRouter, useLocalSearchParams } from "expo-router";
+import * as SecureStore from "expo-secure-store";
 import AcceptOrder from "./AcceptOrder";
 import ReachPickup from "./ReachPickup";
 import PickupDetails from "./PickupDetails";
@@ -27,7 +28,34 @@ const OrderFlow: React.FC = () => {
   const handleDeliveryNext = useCallback((route: "earnings" | "returnVerification") => {
     setCurrentStep(route === "earnings" ? 9 : 5);
   }, []);
-  const handleFinish = useCallback(() => router.push("/(home)"), [router]);
+  const handleFinish = useCallback(async () => {
+    try {
+      await SecureStore.deleteItemAsync("acceptOrder");
+    } catch (e) {
+      console.error("Cleanup error:", e);
+    }
+    router.push("/(home)");
+  }, [router]);
+
+  // Load order data from SecureStore on mount (crucial for resuming active orders!)
+  useEffect(() => {
+    const fetchSavedOrder = async () => {
+      try {
+        const savedOrderStr = await SecureStore.getItemAsync("acceptOrder");
+        if (savedOrderStr) {
+          const parsedOrder = JSON.parse(savedOrderStr);
+          // If we have an _id or orderId, ensure it's mapped correctly for the components
+          if (parsedOrder.orderId && !parsedOrder._id) {
+            parsedOrder._id = parsedOrder.orderId;
+          }
+          setOrder(parsedOrder);
+        }
+      } catch (err) {
+        console.error("Failed to load saved order in OrderFlow:", err);
+      }
+    };
+    fetchSavedOrder();
+  }, []);
 
   // Listen for order updates via socket
   useEffect(() => {

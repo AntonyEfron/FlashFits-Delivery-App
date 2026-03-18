@@ -96,6 +96,8 @@ export default function HomeScreen() {
       // Extract only pickup and delivery amount safely
       const orderData = {
         orderId: payload?._id,
+        orderStatus: payload?.orderStatus,
+        deliveryRiderStatus: payload?.deliveryRiderStatus,
         pickupLocationCorrdinates: payload?.pickupLocation,
         pickupAddress: payload?.address,
         deliveryAmount: payload?.deliveryAmount,
@@ -107,6 +109,25 @@ export default function HomeScreen() {
         deliveryCharge: payload?.deliveryCharge,
       };
 
+      let startStep = 0;
+      const riderStatus = payload?.deliveryRiderStatus;
+      if (riderStatus) {
+        if (riderStatus === "accepted") {
+          startStep = payload?.orderStatus === "packed" ? 2 : 1;
+        } else if (riderStatus === "picked_up") {
+          startStep = 3;
+        } else if (riderStatus === "arrived_at_delivery") {
+          startStep = 4;
+        } else if (riderStatus === "completed try phase") {
+          startStep = 5;
+        } else if (riderStatus === "otp-verified-return") {
+          startStep = 6;
+        } else if (riderStatus === "reached return merchant") {
+          startStep = 8;
+        } else if (riderStatus === "completed" || riderStatus === "merchant-return-otp-verified" || riderStatus === "return_completed") {
+          startStep = 9;
+        }
+      }
 
       const status = await SecureStore.getItemAsync("status");
 
@@ -117,8 +138,8 @@ export default function HomeScreen() {
       await SecureStore.setItemAsync("acceptOrder", JSON.stringify(orderData));
       console.log("✅ Stored order data:", orderData);
 
-      // Navigate to order flow page and pass order data
-      router.push("/(orderFlow)");
+      // Navigate to order flow page and pass active step
+      router.push({ pathname: "/(orderFlow)", params: { step: startStep } });
     };
 
     emitter.on("orderAssigned", handleOrderAssigned);

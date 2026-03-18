@@ -23,7 +23,7 @@ export default function ReachReturnLocation({ onNext, order }: Props) {
   console.log(order, "order");
 
   console.log(coordinates, "coordinates");
-
+ 
   const handleOpenInGoogleMaps = () => {
     console.log("🚀 ~ ReachReturnLocation ~ coordinates:", coordinates);
     if (!coordinates || coordinates.length < 2) {
@@ -89,12 +89,11 @@ export default function ReachReturnLocation({ onNext, order }: Props) {
 
       console.log("📏 Distance to return location:", distance.toFixed(2), "meters");
 
-      // Optional: enforce distance threshold
-      // if (distance > 100) {
-      //   Alert.alert("Too Far", `You are ${distance.toFixed(0)} meters away from the return location.`);
-      //   setLoading(false);
-      //   return;
-      // }
+      if (distance > 70) {
+        Alert.alert("Too Far", `You are ${distance.toFixed(0)} meters away from the return location.\nYou must be within 70 meters.`, [{ text: "OK" }]);
+        setLoading(false);
+        return;
+      }
 
       const orderId = order?._id || order?.orderId;
       if (!orderId) {
