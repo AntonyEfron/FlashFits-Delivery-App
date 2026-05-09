@@ -10,7 +10,7 @@ import {
   Alert,
 } from 'react-native';
 import { CameraView, useCameraPermissions } from 'expo-camera';
-import { Camera, Upload, X, CheckCircle, RotateCcw } from 'lucide-react-native';
+import { Camera, Upload, X, Check, RotateCcw } from 'lucide-react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 
 interface ReturnItemCameraProps {
@@ -35,7 +35,10 @@ export default function ReturnItemCamera({ onNext, orderId }: ReturnItemCameraPr
         return;
       }
     }
-    setCameraActive(true);
+    // Small delay ensures UI is ready before mounting camera
+    setTimeout(() => {
+        setCameraActive(true);
+    }, 100);
   };
 
   const handleCapture = async () => {
@@ -91,11 +94,11 @@ export default function ReturnItemCamera({ onNext, orderId }: ReturnItemCameraPr
               <>
                 <Image source={{ uri: capturedImage }} style={styles.previewImage} />
                 <View style={styles.capturedBadge}>
-                  <CheckCircle color="#fff" size={16} />
+                  <Check color="#fff" size={16} />
                   <Text style={styles.capturedText}>Captured</Text>
                 </View>
               </>
-            ) : cameraActive ? (
+            ) : cameraActive && permission?.granted ? (
               <View style={styles.cameraViewContainer}>
                 <CameraView
                   ref={cameraRef}

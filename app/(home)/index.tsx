@@ -8,6 +8,7 @@ import NavBarHomeScreen from "@/components/HomeScreen/NavBarHomeScreen";
 import DeliveryStatusCard from "@/components/HomeScreen/DeliveryStatusCard";
 import DailyProgressCard from "@/components/HomeScreen/DailyProgressCard";
 import OrderInProgressCard from "@/components/HomeScreen/OrderInProgressCard";
+import { getCurrentWeekEarnings, getRiderIncentives } from "../api/earnings";
 import {
   connectRiderSocket,
   disconnectRiderSocket,
@@ -21,6 +22,8 @@ import {
 export default function HomeScreen() {
   const [riderId, setRiderId] = useState<string | null>(null);
   const [isOnline, setIsOnline] = useState(false);
+  const [todayStats, setTodayStats] = useState({ earnings: 0, orders: 0 });
+  const [incentives, setIncentives] = useState([]);
 
   // ✅ Fetch riderId once and check online status
   useEffect(() => {
@@ -38,6 +41,29 @@ export default function HomeScreen() {
           connectRiderSocket(id);
           startLocationTracking(id);
         }
+      }
+
+      // Fetch today's earnings and incentives
+      try {
+        const [earningsRes, incentivesRes] = await Promise.allSettled([
+          getCurrentWeekEarnings(),
+          getRiderIncentives()
+        ]);
+        
+        if (earningsRes.status === 'fulfilled' && earningsRes.value.success) {
+          const breakdown = earningsRes.value.dailyBreakdown || [];
+          const today = new Date().toISOString().split('T')[0];
+          const todayData = breakdown.find((d: any) => d.date.startsWith(today));
+          if (todayData) {
+            setTodayStats({ earnings: todayData.totalEarnings, orders: todayData.completedOrders });
+          }
+        }
+
+        if (incentivesRes.status === 'fulfilled' && incentivesRes.value.success) {
+          setIncentives(incentivesRes.value.incentives || []);
+        }
+      } catch (err) {
+        console.log("Failed to fetch dashboard stats", err);
       }
     };
     fetchInitialData();
@@ -168,7 +194,11 @@ export default function HomeScreen() {
 
         <OrderInProgressCard />
 
-        <DailyProgressCard />
+        <DailyProgressCard 
+          earnings={todayStats.earnings} 
+          orders={todayStats.orders} 
+          incentives={incentives} 
+        />
       </ScrollView>
     </>
   );

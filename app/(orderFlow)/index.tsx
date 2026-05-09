@@ -60,12 +60,13 @@ const OrderFlow: React.FC = () => {
   // Listen for order updates via socket
   useEffect(() => {
     const handleOrder = (payload: any) => {
+      // Prevent backward navigation from delayed socket events
       if (payload.orderStatus === "completed try phase") {
-        setCurrentStep(5);
+        setCurrentStep((prev) => Math.max(prev, 5));
       } else if (payload.deliveryRiderStatus === "completed") {
-        setCurrentStep(9);
+        setCurrentStep((prev) => Math.max(prev, 9));
       }
-      setOrder(payload);
+      setOrder({...payload, _id: payload.orderId || payload._id}); // Ensure _id exists
     };
 
     emitter.on("orderUpdate", (payload) => {

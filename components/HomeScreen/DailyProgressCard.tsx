@@ -6,12 +6,14 @@ interface DailyProgressCardProps {
   earnings?: number;
   onlineTime?: string;
   orders?: number;
+  incentives?: any[];
 }
 
 const DailyProgressCard: React.FC<DailyProgressCardProps> = ({
   earnings = 0,
   onlineTime = '0h 0m',
   orders = 0,
+  incentives = [],
 }) => {
   const router = useRouter();
 
@@ -53,12 +55,44 @@ const DailyProgressCard: React.FC<DailyProgressCardProps> = ({
           </View>
         </View>
 
-        {/* Simulate Order Button */}
+        {/* Mini Incentive Tracker */}
+        {incentives && incentives.length > 0 && (
+          <View style={styles.incentiveContainer}>
+            <Text style={styles.incentiveTitle}>🎯 Active Incentives</Text>
+            {incentives.slice(0, 2).map((inc, idx) => {
+              const progress = inc.progress || {};
+              const nextSlab = progress.nextSlab;
+              const currentSlab = progress.currentSlab;
+              const maxOrders = nextSlab ? nextSlab.minOrders : (currentSlab ? currentSlab.minOrders : 1);
+              const progressRatio = Math.min((progress.completedOrders || 0) / maxOrders, 1);
+              
+              return (
+                <View key={idx} style={styles.miniIncentiveItem}>
+                  <View style={styles.miniIncentiveHeader}>
+                    <Text style={styles.miniIncentiveName}>{inc.name}</Text>
+                    <Text style={styles.miniIncentiveStatus}>
+                      {progress.completedOrders || 0}/{maxOrders}
+                    </Text>
+                  </View>
+                  <View style={styles.miniProgressBarBg}>
+                    <View 
+                      style={[
+                        styles.miniProgressBarFill, 
+                        { width: `${progressRatio * 100}%`, backgroundColor: currentSlab ? '#10b981' : '#3b82f6' }
+                      ]} 
+                    />
+                  </View>
+                </View>
+              );
+            })}
+          </View>
+        )}
+
         <TouchableOpacity
           style={styles.orderButton}
-          onPress={() => router.push('/(orderFlow)')}
+          onPress={() => router.push('/(home)/Earnings')}
         >
-          <Text style={styles.orderButtonText}>Simulate Order</Text>
+          <Text style={styles.orderButtonText}>View Earnings Dashboard</Text>
         </TouchableOpacity>
       </View>
     </View>
@@ -108,6 +142,44 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     fontSize: 16,
     color: '#fff',
+  },
+  incentiveContainer: {
+    marginTop: 16,
+    paddingTop: 16,
+    borderTopWidth: 1,
+    borderTopColor: '#f3f4f6',
+  },
+  incentiveTitle: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#374151',
+    marginBottom: 8,
+  },
+  miniIncentiveItem: {
+    marginBottom: 8,
+  },
+  miniIncentiveHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginBottom: 4,
+  },
+  miniIncentiveName: {
+    fontSize: 12,
+    color: '#4b5563',
+    fontWeight: '500',
+  },
+  miniIncentiveStatus: {
+    fontSize: 12,
+    color: '#6b7280',
+  },
+  miniProgressBarBg: {
+    height: 6,
+    backgroundColor: '#e5e7eb',
+    borderRadius: 3,
+  },
+  miniProgressBarFill: {
+    height: 6,
+    borderRadius: 3,
   },
 });
 
