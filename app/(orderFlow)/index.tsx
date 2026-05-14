@@ -61,7 +61,7 @@ const OrderFlow: React.FC = () => {
   useEffect(() => {
     const handleOrder = (payload: any) => {
       // Prevent backward navigation from delayed socket events
-      if (payload.orderStatus === "completed try phase") {
+      if (payload.orderStatus === "selection_made") {
         setCurrentStep((prev) => Math.max(prev, 5));
       } else if (payload.deliveryRiderStatus === "completed") {
         setCurrentStep((prev) => Math.max(prev, 9));

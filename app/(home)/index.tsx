@@ -138,19 +138,26 @@ export default function HomeScreen() {
       let startStep = 0;
       const riderStatus = payload?.deliveryRiderStatus;
       if (riderStatus) {
-        if (riderStatus === "accepted") {
+        if (riderStatus === "assigned") {
           startStep = payload?.orderStatus === "packed" ? 2 : 1;
-        } else if (riderStatus === "picked_up") {
+        } else if (riderStatus === "at_pickup") {
+          startStep = 2;
+        } else if (riderStatus === "picked_up" || riderStatus === "en_route_delivery") {
           startStep = 3;
-        } else if (riderStatus === "arrived_at_delivery") {
+        } else if (riderStatus === "at_delivery") {
           startStep = 4;
-        } else if (riderStatus === "completed try phase") {
-          startStep = 5;
-        } else if (riderStatus === "otp-verified-return") {
-          startStep = 6;
-        } else if (riderStatus === "reached return merchant") {
+        } else if (riderStatus === "try_phase") {
+          // Check if selection was made to decide if we're at return step
+          if (payload?.orderStatus === "selection_made" || payload?.orderStatus === "return_in_progress") {
+            startStep = 5;
+          } else {
+            startStep = 4;
+          }
+        } else if (riderStatus === "returning") {
+          startStep = 7;
+        } else if (riderStatus === "at_merchant_return") {
           startStep = 8;
-        } else if (riderStatus === "completed" || riderStatus === "merchant-return-otp-verified" || riderStatus === "return_completed") {
+        } else if (riderStatus === "completed") {
           startStep = 9;
         }
       }
