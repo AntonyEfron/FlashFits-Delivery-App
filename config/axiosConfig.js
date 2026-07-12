@@ -14,7 +14,11 @@ api.interceptors.request.use(
   async (config) => {
     const token = await SecureStore.getItemAsync("token");
     if (token) {
-      config.headers.Authorization = `Bearer ${token}`;
+      if (config.headers && typeof config.headers.set === 'function') {
+        config.headers.set('Authorization', `Bearer ${token}`);
+      } else {
+        config.headers.Authorization = `Bearer ${token}`;
+      }
     }
     return config;
   },
@@ -39,12 +43,22 @@ api.interceptors.response.use(
   (response) => response,
   async (error) => {
     const originalRequest = error.config;
-    if (error.response?.status === 401 && !originalRequest._retry) {
+    
+    // Do not trigger token refresh for public / auth endpoints
+    const isPublicEndpoint = originalRequest.url?.includes('auth/verify-otp') || 
+                             originalRequest.url?.includes('auth/refresh') ||
+                             originalRequest.url?.includes('/register');
+
+    if (error.response?.status === 401 && !originalRequest._retry && !isPublicEndpoint) {
       if (isRefreshing) {
         return new Promise(function(resolve, reject) {
           failedQueue.push({ resolve, reject });
         }).then(token => {
-          originalRequest.headers.Authorization = 'Bearer ' + token;
+          if (originalRequest.headers && typeof originalRequest.headers.set === 'function') {
+            originalRequest.headers.set('Authorization', `Bearer ${token}`);
+          } else {
+            originalRequest.headers.Authorization = `Bearer ${token}`;
+          }
           return api(originalRequest);
         }).catch(err => Promise.reject(err));
       }
@@ -69,7 +83,11 @@ api.interceptors.response.use(
           processQueue(null, token);
           isRefreshing = false;
           
-          originalRequest.headers.Authorization = `Bearer ${token}`;
+          if (originalRequest.headers && typeof originalRequest.headers.set === 'function') {
+            originalRequest.headers.set('Authorization', `Bearer ${token}`);
+          } else {
+            originalRequest.headers.Authorization = `Bearer ${token}`;
+          }
           return api(originalRequest);
         } else {
           throw new Error("Invalid token refresh response");

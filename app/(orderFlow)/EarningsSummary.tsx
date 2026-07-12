@@ -18,34 +18,36 @@ interface EarningsSummaryProps {
  * Derives real earnings from the order object.
  */
 const EarningsSummary: React.FC<EarningsSummaryProps> = ({ onFinish, order }) => {
-  const baseFare = order?.deliveryCharge ?? 0;
+  // Real earnings from the order's charges
+  const baseFare = order?.deliveryCharge || order?.deliveryAmount || 0;
+  const returnCharge = order?.returnCharge || 0;
 
-  // Overtime = minutes beyond 8 free mins × ₹1/min (rider gets a portion)
-  const overtimePenalty = order?.overtimePenalty ?? 0;
-  const riderOvertimeShare = Math.round(overtimePenalty * 0.3); // rider earns 30% of overtime fee
-
-  // Return bonus: if any items were returned, rider gets a small bonus for the return trip
+  // Check return/keep status
   const hasReturns = order?.items?.some((i: any) => i.tryStatus === 'returned');
-  const returnBonus = hasReturns ? Math.max(10, Math.round((order?.returnCharge ?? 0) * 0.2)) : 0;
+  const returnBonus = hasReturns ? returnCharge : 0;
+
+  // Tip from customer (if any)
+  const deliveryTip = order?.finalBilling?.deliveryTip || 0;
 
   const breakdown = useMemo(() => {
     const rows: { label: string; amount: number; icon: string; color: string }[] = [];
 
     if (baseFare > 0) {
-      rows.push({ label: 'Base Delivery Fare', amount: baseFare, icon: '🚴', color: '#3b82f6' });
-    }
-    if (riderOvertimeShare > 0) {
-      rows.push({ label: 'Overtime Bonus', amount: riderOvertimeShare, icon: '⏱️', color: '#f59e0b' });
+      rows.push({ label: 'Delivery Fare', amount: baseFare, icon: '🚴', color: '#3b82f6' });
     }
     if (returnBonus > 0) {
-      rows.push({ label: 'Return Trip Bonus', amount: returnBonus, icon: '🔄', color: '#10b981' });
+      rows.push({ label: 'Return Trip Charge', amount: returnBonus, icon: '🔄', color: '#10b981' });
     }
-    // Fallback if order is not passed
+    if (deliveryTip > 0) {
+      rows.push({ label: 'Customer Tip', amount: deliveryTip, icon: '💝', color: '#f59e0b' });
+    }
+    // If no real data is available, show a placeholder
     if (rows.length === 0) {
-      rows.push({ label: 'Base Delivery Fare', amount: 65, icon: '🚴', color: '#3b82f6' });
+      rows.push({ label: 'Delivery Fare', amount: 0, icon: '🚴', color: '#3b82f6' });
     }
     return rows;
-  }, [baseFare, riderOvertimeShare, returnBonus]);
+  }, [baseFare, returnBonus, deliveryTip]);
+
 
   const totalEarnings = breakdown.reduce((sum, item) => sum + item.amount, 0);
 

@@ -47,10 +47,10 @@ export const submitBankDetails = async (bankData) => {
 
 export const getZones = async()=>{
   try {
-    const response = await axiosInstance.get("/admin/zone");
+    const response = await axiosInstance.get("/deliveryRider/zones");
     return response.data;
   } catch (error) {
-    console.error("Error submitting bank details:", error.response?.data || error.message);
+    console.error("Error fetching zones:", error.response?.data || error.message);
     throw error.response?.data || error;
   }
 }

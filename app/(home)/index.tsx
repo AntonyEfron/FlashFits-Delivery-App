@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import { View, StyleSheet, ScrollView, Alert, Linking } from "react-native";
+import { View, Text, StyleSheet, ScrollView, Alert, Linking } from "react-native";
 import { router } from "expo-router";
 import * as SecureStore from "expo-secure-store";
 import * as Location from "expo-location";
@@ -8,21 +8,57 @@ import NavBarHomeScreen from "@/components/HomeScreen/NavBarHomeScreen";
 import DeliveryStatusCard from "@/components/HomeScreen/DeliveryStatusCard";
 import DailyProgressCard from "@/components/HomeScreen/DailyProgressCard";
 import OrderInProgressCard from "@/components/HomeScreen/OrderInProgressCard";
-import { getCurrentWeekEarnings, getRiderIncentives } from "../api/earnings";
+import { getCurrentWeekEarnings, getRiderIncentives, getTodayEarnings, getYesterdayEarnings } from "../api/earnings";
+import { startOnlineSession, endOnlineSession } from "../api/session";
 import {
   connectRiderSocket,
   disconnectRiderSocket,
   emitter,
 } from "../../config/socketConfig";
+import { GetActiveOrderApi } from "../api/orderFlow";
 import {
   startLocationTracking,
   stopLocationTracking,
+  initializeLocationTracking,
 } from "@/utils/updateLocation";
+
+/**
+ * Maps deliveryRiderStatus + orderStatus to the correct order flow step.
+ * Must stay in sync with OrderFlow/index.tsx resolveStep().
+ */
+function resolveStartStep(riderStatus: string, orderStatus: string): number {
+  switch (riderStatus) {
+    case "assigned":
+    case "en_route_pickup":
+      return orderStatus === "packed" ? 2 : 1;
+    case "at_pickup":
+      return 2;
+    case "picked_up":
+    case "en_route_delivery":
+      return 3;
+    case "at_delivery":
+      return 4;
+    case "try_phase":
+      if (orderStatus === "selection_made" || orderStatus === "return_in_progress") return 5;
+      return 4;
+    case "returning":
+      return 7;
+    case "at_merchant_return":
+      return 8;
+    case "completed":
+      return 9;
+    default:
+      return 0;
+  }
+}
 
 export default function HomeScreen() {
   const [riderId, setRiderId] = useState<string | null>(null);
   const [isOnline, setIsOnline] = useState(false);
-  const [todayStats, setTodayStats] = useState({ earnings: 0, orders: 0 });
+  const [isConnected, setIsConnected] = useState(true);
+  const [isReconnecting, setIsReconnecting] = useState(false);
+  const [todayStats, setTodayStats] = useState({ earnings: 0, orders: 0, loginHours: 0 });
+  const [yesterdayStats, setYesterdayStats] = useState({ earnings: 0, orders: 0 });
   const [incentives, setIncentives] = useState([]);
 
   // ✅ Fetch riderId once and check online status
@@ -34,29 +70,93 @@ export default function HomeScreen() {
 
       const savedOnlineStatus = await SecureStore.getItemAsync("isOnline");
       if (savedOnlineStatus === "true") {
-        setIsOnline(true);
-        // If they left the app while online, make sure socket connects
-        if (id) {
-          console.log("🟢 Reconnecting socket for rider:", id);
-          connectRiderSocket(id);
-          startLocationTracking(id);
+        // Enforce permissions before allowing them to stay online on boot
+        const { status: fgStatus } = await Location.getForegroundPermissionsAsync();
+        const { status: bgStatus } = await Location.getBackgroundPermissionsAsync();
+
+        if (fgStatus === "granted" && bgStatus === "granted") {
+          setIsOnline(true);
+          // If they left the app while online, make sure socket connects
+          if (id) {
+            console.log("🟢 Reconnecting socket for rider:", id);
+            connectRiderSocket(id);
+            // Resume or create online session (idempotent)
+            startOnlineSession().catch((err) =>
+              console.log("Session resume on boot (non-fatal):", err.message)
+            );
+          }
+        } else {
+          console.log("⚠️ Permissions revoked while closed. Forcing offline.");
+          await SecureStore.setItemAsync("isOnline", "false");
+          setIsOnline(false);
+          Alert.alert(
+            "Permissions Revoked",
+            "Location permissions were revoked. You have been taken offline.",
+            [{ text: "OK" }]
+          );
         }
       }
 
-      // Fetch today's earnings and incentives
+      if (id) {
+        initializeLocationTracking(id);
+        
+        // Sync active order to fix stale orders stuck in progress
+        try {
+          const activeOrderRes = await GetActiveOrderApi();
+          if (activeOrderRes?.success) {
+            if (activeOrderRes.order) {
+              const o = activeOrderRes.order;
+              const orderData = {
+                orderId: o?._id,
+                orderStatus: o?.orderStatus,
+                deliveryRiderStatus: o?.deliveryRiderStatus,
+                pickupLocationCorrdinates: o?.pickupLocation,
+                pickupAddress: o?.address,
+                deliveryAmount: o?.deliveryAmount,
+                shopName: o?.merchantId?.shopName || "Unknown Shop",
+                items: o?.items,
+                deliveryDistance: o?.deliveryDistance,
+                customerLocation: o?.customerLocation,
+                cutomerAddress: o?.cutomerAddress,
+                deliveryCharge: o?.deliveryCharge,
+              };
+              const startStep = resolveStartStep(o.deliveryRiderStatus || "", o.orderStatus || "");
+              await SecureStore.setItemAsync("acceptOrder", JSON.stringify(orderData));
+              await SecureStore.setItemAsync("orderStep", String(startStep));
+            } else {
+              await SecureStore.deleteItemAsync("acceptOrder");
+              await SecureStore.deleteItemAsync("currentOrderId");
+              await SecureStore.deleteItemAsync("orderStep");
+              await SecureStore.deleteItemAsync("status");
+              await SecureStore.deleteItemAsync("startTime");
+            }
+            emitter.emit("orderSynced");
+          }
+        } catch (err) {
+          console.log("Failed to sync active order:", err);
+        }
+      }
+
+      // Fetch today's earnings, yesterday, and incentives
       try {
-        const [earningsRes, incentivesRes] = await Promise.allSettled([
-          getCurrentWeekEarnings(),
+        const [todayRes, yesterdayRes, incentivesRes] = await Promise.allSettled([
+          getTodayEarnings(),
+          getYesterdayEarnings(),
           getRiderIncentives()
         ]);
         
-        if (earningsRes.status === 'fulfilled' && earningsRes.value.success) {
-          const breakdown = earningsRes.value.dailyBreakdown || [];
-          const today = new Date().toISOString().split('T')[0];
-          const todayData = breakdown.find((d: any) => d.date.startsWith(today));
-          if (todayData) {
-            setTodayStats({ earnings: todayData.totalEarnings, orders: todayData.completedOrders });
-          }
+        if (todayRes.status === 'fulfilled' && todayRes.value.success) {
+          const data = todayRes.value.payout || {};
+          setTodayStats({ 
+            earnings: data.totalEarnings || 0, 
+            orders: data.completedOrders || 0,
+            loginHours: data.loginHours || 0
+          });
+        }
+
+        if (yesterdayRes.status === 'fulfilled' && yesterdayRes.value.success) {
+          const data = yesterdayRes.value.payout || {};
+          setYesterdayStats({ earnings: data.totalEarnings || 0, orders: data.completedOrders || 0 });
         }
 
         if (incentivesRes.status === 'fulfilled' && incentivesRes.value.success) {
@@ -67,6 +167,19 @@ export default function HomeScreen() {
       }
     };
     fetchInitialData();
+  }, []);
+
+  // ✅ Listen for socket connection status
+  useEffect(() => {
+    const handleConnectionStatus = ({ connected, reconnecting }: { connected: boolean; reconnecting: boolean }) => {
+      setIsConnected(connected);
+      setIsReconnecting(reconnecting);
+    };
+
+    emitter.on("connectionStatus", handleConnectionStatus);
+    return () => {
+      emitter.off("connectionStatus", handleConnectionStatus);
+    };
   }, []);
 
   // ✅ Handle Go Online / Offline
@@ -83,7 +196,22 @@ export default function HomeScreen() {
       if (permStatus !== "granted") {
         Alert.alert(
           "Permission denied",
-          "You must allow location access to go online."
+          "You must allow location access to go online.",
+          [{ text: "Open Settings", onPress: () => Linking.openSettings() }, { text: "Cancel", style: "cancel" }]
+        );
+        setIsOnline(false);
+        await SecureStore.setItemAsync("isOnline", "false");
+        return;
+      }
+
+      const { status: bgPermStatus } =
+        await Location.requestBackgroundPermissionsAsync();
+
+      if (bgPermStatus !== "granted") {
+        Alert.alert(
+          "Background Permission Required",
+          "You must allow 'Always' background location access to go online so we can track deliveries while the app is closed.",
+          [{ text: "Open Settings", onPress: () => Linking.openSettings() }, { text: "Cancel", style: "cancel" }]
         );
         setIsOnline(false);
         await SecureStore.setItemAsync("isOnline", "false");
@@ -104,10 +232,22 @@ export default function HomeScreen() {
         console.log("🟢 Connecting socket for rider:", riderId);
         connectRiderSocket(riderId);
         startLocationTracking(riderId);
+        // Start online session on backend (fire-and-forget)
+        startOnlineSession().catch((err) =>
+          console.log("Session start (non-fatal):", err.message)
+        );
       }
     } else {
       console.log("🔴 Disconnecting socket & stopping tracking...");
-      disconnectRiderSocket();
+      // End online session on backend before disconnecting
+      endOnlineSession().catch((err) =>
+        console.log("Session end (non-fatal):", err.message)
+      );
+      if (riderId) {
+        disconnectRiderSocket(riderId);
+      } else {
+        disconnectRiderSocket();
+      }
       await stopLocationTracking();
     }
   };
@@ -117,9 +257,7 @@ export default function HomeScreen() {
     const handleOrderAssigned = async (payload: any) => {
       console.log("📦 Order assigned on Home:", payload);
 
-      console.log("✅ Payload order data:", payload);
-
-      // Extract only pickup and delivery amount safely
+      // Extract order data
       const orderData = {
         orderId: payload?._id,
         orderStatus: payload?.orderStatus,
@@ -135,43 +273,20 @@ export default function HomeScreen() {
         deliveryCharge: payload?.deliveryCharge,
       };
 
-      let startStep = 0;
-      const riderStatus = payload?.deliveryRiderStatus;
-      if (riderStatus) {
-        if (riderStatus === "assigned") {
-          startStep = payload?.orderStatus === "packed" ? 2 : 1;
-        } else if (riderStatus === "at_pickup") {
-          startStep = 2;
-        } else if (riderStatus === "picked_up" || riderStatus === "en_route_delivery") {
-          startStep = 3;
-        } else if (riderStatus === "at_delivery") {
-          startStep = 4;
-        } else if (riderStatus === "try_phase") {
-          // Check if selection was made to decide if we're at return step
-          if (payload?.orderStatus === "selection_made" || payload?.orderStatus === "return_in_progress") {
-            startStep = 5;
-          } else {
-            startStep = 4;
-          }
-        } else if (riderStatus === "returning") {
-          startStep = 7;
-        } else if (riderStatus === "at_merchant_return") {
-          startStep = 8;
-        } else if (riderStatus === "completed") {
-          startStep = 9;
-        }
-      }
+      // Resolve start step using centralized logic
+      const riderStatus = payload?.deliveryRiderStatus || "";
+      const orderStatus = payload?.orderStatus || "";
+      const startStep = resolveStartStep(riderStatus, orderStatus);
 
-      const status = await SecureStore.getItemAsync("status");
+      // Clean up any stale status
+      await SecureStore.deleteItemAsync("status");
 
-      if (status) {
-        await SecureStore.deleteItemAsync("status");
-      }
-      // Store only relevant data securely
+      // Store order data + step
       await SecureStore.setItemAsync("acceptOrder", JSON.stringify(orderData));
-      console.log("✅ Stored order data:", orderData);
+      await SecureStore.setItemAsync("orderStep", String(startStep));
+      console.log("✅ Stored order data, navigating to step:", startStep);
 
-      // Navigate to order flow page and pass active step
+      // Navigate to order flow page
       router.push({ pathname: "/(orderFlow)", params: { step: startStep } });
     };
 
@@ -182,9 +297,6 @@ export default function HomeScreen() {
     };
   }, []);
 
-  // ✅ Basic UI
-  const handleGoOnline = () => setIsOnline(true);
-
   return (
     <>
       <NavBarHomeScreen
@@ -192,18 +304,30 @@ export default function HomeScreen() {
         onToggleOnline={handleToggleOnline}
       />
 
+      {/* Connection status banner */}
+      {isOnline && !isConnected && (
+        <View style={styles.connectionBanner}>
+          <Text style={styles.connectionText}>
+            {isReconnecting ? "🔄 Reconnecting..." : "⚠️ Disconnected"}
+          </Text>
+        </View>
+      )}
+
       <ScrollView
         style={styles.scrollContent}
         contentContainerStyle={styles.scrollInner}
         showsVerticalScrollIndicator={false}
       >
-        <DeliveryStatusCard isOnline={isOnline} onGoOnline={handleGoOnline} />
+        <DeliveryStatusCard isOnline={isOnline} onGoOnline={() => handleToggleOnline(true)} />
 
         <OrderInProgressCard />
 
         <DailyProgressCard 
           earnings={todayStats.earnings} 
           orders={todayStats.orders} 
+          onlineTime={`${Math.floor(todayStats.loginHours)}h ${Math.round((todayStats.loginHours - Math.floor(todayStats.loginHours)) * 60)}m`}
+          yesterdayEarnings={yesterdayStats.earnings}
+          yesterdayOrders={yesterdayStats.orders}
           incentives={incentives} 
         />
       </ScrollView>
@@ -218,5 +342,16 @@ const styles = StyleSheet.create({
   scrollInner: {
     padding: 16,
     paddingBottom: 32,
+  },
+  connectionBanner: {
+    backgroundColor: "#fbbf24",
+    paddingVertical: 6,
+    paddingHorizontal: 16,
+    alignItems: "center",
+  },
+  connectionText: {
+    fontSize: 13,
+    fontWeight: "600",
+    color: "#78350f",
   },
 });

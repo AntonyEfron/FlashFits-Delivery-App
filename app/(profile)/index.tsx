@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { getSocket } from '../../config/socketConfig';
 
 import {
@@ -6,22 +6,38 @@ import {
   Text,
   StyleSheet,
   TouchableOpacity,
-  Image,
   ScrollView,
   Alert,
+  ActivityIndicator,
 } from 'react-native';
 import * as SecureStore from 'expo-secure-store';
 import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
+import { getRider } from '../api/auth';
+import { clearTrackingOnLogout } from '../../utils/updateLocation';
 
 const ProfilePage = () => {
-  const user = {
-    name: 'John Doe',
-    email: 'john.doe@example.com',
-    phone: '+1 (555) 123-4567',
-    avatar: 'https://via.placeholder.com/100',
-    joinDate: 'January 2023',
-  };
+  const [rider, setRider] = useState<any>(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const fetchProfile = async () => {
+      try {
+        const response = await getRider();
+        if (response?.success && response?.rider) {
+          setRider(response.rider);
+        } else if (response?.rider) {
+          setRider(response.rider);
+        }
+      } catch (error) {
+        console.error('Error fetching rider profile:', error);
+        Alert.alert('Error', 'Failed to load profile details.');
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchProfile();
+  }, []);
 
   const handleLogout = async () => {
     Alert.alert('Logout', 'Are you sure you want to logout?', [
@@ -34,13 +50,14 @@ const ProfilePage = () => {
             // 1️⃣ Disconnect socket if active
             const socket = getSocket();
             if (socket && socket.connected) {
-              // socket.emit('riderOffline'); // optional: tell server rider went offline
               socket.disconnect();
               console.log('Socket disconnected successfully');
             }
   
-            // 2️⃣ Clear storage
+            // 2️⃣ Clear storage & tracking
+            await clearTrackingOnLogout();
             await SecureStore.deleteItemAsync('token');
+            await SecureStore.deleteItemAsync('refreshToken');
             await SecureStore.deleteItemAsync('deliveryRiderId');
   
             // 3️⃣ Navigate
@@ -58,9 +75,18 @@ const ProfilePage = () => {
   const ProfileItem = ({ label, value }) => (
     <View style={styles.profileItem}>
       <Text style={styles.label}>{label}</Text>
-      <Text style={styles.value}>{value}</Text>
+      <Text style={styles.value}>{value || '--'}</Text>
     </View>
   );
+
+  if (loading) {
+    return (
+      <View style={[styles.container, styles.center]}>
+        <ActivityIndicator size="large" color="#007bff" />
+        <Text style={styles.loadingText}>Loading profile...</Text>
+      </View>
+    );
+  }
 
   return (
     <View style={styles.container}>
@@ -75,31 +101,23 @@ const ProfilePage = () => {
 
       <ScrollView contentContainerStyle={styles.scrollContainer}>
         {/* Header */}
-      <View style={styles.profileHeader}>
-        <Text style={styles.headerName}>Antony Efron</Text>
-        <Text style={styles.headerPhone}>+91 - 8138834116</Text>
-        <Text style={styles.headerEmail}>antonyefron007@gmail.com</Text>
-      </View>
+        <View style={styles.profileHeader}>
+          <Text style={styles.headerName}>{rider?.fullName || 'Delivery Partner'}</Text>
+          <Text style={styles.headerPhone}>📞 {rider?.phone || '--'}</Text>
+          <Text style={styles.headerEmail}>✉️ {rider?.email || '--'}</Text>
+        </View>
 
         {/* Profile Information */}
-        {/* <View style={styles.profileSection}>
-          <Text style={styles.sectionTitle}>Profile Information</Text>
-          <ProfileItem label="Full Name" value={user.name} />
-          <ProfileItem label="Email" value={user.email} />
-          <ProfileItem label="Phone" value={user.phone} />
-          <ProfileItem label="Member Since" value={user.joinDate} />
-        </View> */}
+        <View style={styles.profileSection}>
+          <Text style={styles.sectionTitle}>Delivery Area Details</Text>
+          <ProfileItem label="Assigned City" value={rider?.city} />
+          <ProfileItem label="Assigned Zone" value={rider?.zoneName} />
+          <ProfileItem label="Pincode" value={rider?.pincode} />
+          <ProfileItem label="Status" value={rider?.status?.toUpperCase()} />
+        </View>
 
         {/* Action Buttons */}
         <View style={styles.actionSection}>
-          <TouchableOpacity style={styles.editButton}>
-            <Text style={styles.editButtonText}>Edit Profile</Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity style={styles.settingsButton}>
-            <Text style={styles.settingsButtonText}>Settings</Text>
-          </TouchableOpacity>
-
           <TouchableOpacity style={styles.logoutButton} onPress={handleLogout}>
             <Text style={styles.logoutButtonText}>Logout</Text>
           </TouchableOpacity>
@@ -110,6 +128,15 @@ const ProfilePage = () => {
 };
 
 const styles = StyleSheet.create({
+  center: {
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  loadingText: {
+    marginTop: 12,
+    color: '#888',
+    fontSize: 16,
+  },
   container: {
     flex: 1,
     backgroundColor: '#f5f5f5',

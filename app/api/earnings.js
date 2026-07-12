@@ -14,6 +14,26 @@ export const getCurrentWeekEarnings = async () => {
   }
 };
 
+export const getTodayEarnings = async () => {
+  try {
+    const response = await axiosInstance.get("/deliveryRider/earnings/today");
+    return response.data;
+  } catch (error) {
+    console.error("❌ getTodayEarnings:", error.response?.data || error.message);
+    throw error;
+  }
+};
+
+export const getYesterdayEarnings = async () => {
+  try {
+    const response = await axiosInstance.get("/deliveryRider/earnings/yesterday");
+    return response.data;
+  } catch (error) {
+    console.error("❌ getYesterdayEarnings:", error.response?.data || error.message);
+    throw error;
+  }
+};
+
 /**
  * GET /api/rider/earnings/history
  * Returns past weekly payouts (paginated).

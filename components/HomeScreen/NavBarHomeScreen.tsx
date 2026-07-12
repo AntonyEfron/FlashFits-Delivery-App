@@ -71,6 +71,15 @@ const handleProfile = () => {
 
       {/* Right Section - Action Icons */}
       <View style={styles.rightSection}>
+        <TouchableOpacity
+          style={styles.iconButton}
+          onPress={() => router.push('/(notifications)')}
+        >
+          <View style={styles.iconContainer}>
+            <Text style={styles.alertIcon}>🔔</Text>
+          </View>
+        </TouchableOpacity>
+
         <TouchableOpacity style={styles.iconButton} onPress={handleHelp}>
           <View style={styles.iconContainer}>
             <Text style={styles.alertIcon}>⚠️</Text>

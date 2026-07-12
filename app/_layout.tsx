@@ -4,6 +4,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import * as SecureStore from "expo-secure-store";
 import {emitter} from '../config/socketConfig'
 import { useEffect } from "react";
+import "../utils/updateLocation";
 
 export default function RootLayout() {
   

@@ -14,6 +14,7 @@ import * as SecureStore from "expo-secure-store";
 import { AcceptOrderApi } from "../api/orderFlow";
 import { joinOrderRoom } from "../../config/socketConfig";
 import { emitter } from "../../config/socketConfig";
+import { stopOrderAlert } from "../../utils/alertManager";
 
 const { width } = Dimensions.get("window");
 
@@ -90,6 +91,9 @@ const AcceptOrder: React.FC<AcceptOrderProps> = ({ onNext }) => {
 
   const handleAcceptOrder = async () => {
     try {
+      // Stop the alerting sound and vibration immediately
+      stopOrderAlert();
+
       setLoading(true);
 
       if (!order) {

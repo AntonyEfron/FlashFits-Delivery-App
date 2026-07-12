@@ -41,8 +41,8 @@ function TabsWithCart() {
             iconName = focused ? 'cash' : 'cash-outline';
             label = 'Earnings';
           } else if (route.name === 'More') {
-            iconName = focused ? 'menu' : 'menu-outline';
-            label = 'More';
+            iconName = focused ? 'person' : 'person-outline';
+            label = 'Profile';
           }
 
           return <AnimatedTabIcon focused={focused} iconName={iconName} size={size} color={color} label={label} />;
@@ -51,7 +51,7 @@ function TabsWithCart() {
     >
       <Tabs.Screen name="index" options={{ title: 'Home' }} />
       <Tabs.Screen name="Earnings" options={{ title: 'Earnings' }} />
-      <Tabs.Screen name="More" options={{ title: 'More' }} />
+      <Tabs.Screen name="More" options={{ title: 'Profile', href: '/(profile)' }} />
     </Tabs>
   );
 }

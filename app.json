@@ -7,7 +7,7 @@
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
     "newArchEnabled": true,
-    "scheme": "flashfits", 
+    "scheme": "flashfits",
     "splash": {
       "image": "./assets/splash-icon.png",
       "resizeMode": "contain",
@@ -15,7 +15,15 @@
     },
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.flashfits.delivery"
+      "bundleIdentifier": "com.flashfits.delivery",
+      "infoPlist": {
+        "UIBackgroundModes": [
+          "location"
+        ],
+        "NSLocationWhenInUseUsageDescription": "This app needs your location to assign nearby orders and navigate to pickup/delivery.",
+        "NSLocationAlwaysAndWhenInUseUsageDescription": "This app needs your location in the background to track order delivery status and calculate incentives.",
+        "NSLocationAlwaysUsageDescription": "This app needs your location in the background to track order delivery status and calculate incentives."
+      }
     },
     "android": {
       "adaptiveIcon": {
@@ -23,10 +31,23 @@
         "backgroundColor": "#ffffff"
       },
       "edgeToEdgeEnabled": true,
-      "package": "com.flashfits.delivery"
+      "package": "com.flashfits.delivery",
+      "permissions": [
+        "ACCESS_COARSE_LOCATION",
+        "ACCESS_FINE_LOCATION",
+        "ACCESS_BACKGROUND_LOCATION",
+        "FOREGROUND_SERVICE",
+        "FOREGROUND_SERVICE_LOCATION"
+      ]
     },
     "web": {
       "favicon": "./assets/favicon.png"
+    },
+    "extra": {
+      "BACKEND_URL": "http://192.168.29.230:5000",
+      "eas": {
+        "projectId": "e1c32e96-5683-4f7d-acb3-58a1b3fa69b1"
+      }
     }
   }
 }

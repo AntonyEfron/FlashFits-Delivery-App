@@ -10,11 +10,13 @@ import {
   Linking,
   ActivityIndicator,
   Dimensions,
+  TextInput,
 } from "react-native";
 import * as SecureStore from "expo-secure-store";
 import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
 import { AnimatedDots } from "../../components/OrderFlowComponents/AnimatedDots";
 import { HandoverPackageApi } from "../api/orderFlow";
+import { emitter } from "../../config/socketConfig";
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get("window");
 const FALLBACK_LOCATION = { lat: 9.9312, lng: 76.2673 };
@@ -97,12 +99,13 @@ const DeliveryDetails = ({
 }) => {
   const [status, setStatus] = useState<DeliveryStatus>("pending");
   const [timeElapsed, setTimeElapsed] = useState(0);
-  const [earnings, setEarnings] = useState(0);
   const [orderData, setOrderData] = useState<any>(null);
+  const [handoverOtp, setHandoverOtp] = useState("");
 
   const TRY_DURATION = 600; // 10 min max
-  const BASE_EARNINGS = 8;
-  const EARNINGS_AFTER_10MIN = 2;
+
+  // Real earnings from the order's deliveryCharge (not fictitious calculation)
+  const deliveryEarnings = orderData?.deliveryCharge || orderData?.deliveryAmount || 0;
 
   // Load stored order and saved state
   useEffect(() => {
@@ -132,17 +135,53 @@ const DeliveryDetails = ({
     fetchOrderAndState();
   }, []);
 
+  // Listen for orderUpdate events — auto-navigate on customer decision
+  useEffect(() => {
+    const handleOrderUpdate = (payload: any) => {
+      const riderStatus = payload?.deliveryRiderStatus;
+      const oStatus = payload?.orderStatus;
+
+      // Customer kept everything and paid → order completed → go to earnings
+      if (riderStatus === "completed" || oStatus === "completed") {
+        SecureStore.deleteItemAsync("status").catch(() => {});
+        SecureStore.deleteItemAsync("startTime").catch(() => {});
+        onNext("earnings");
+        return;
+      }
+
+      // Customer made selection with returns → go to return verification
+      if (oStatus === "return_in_progress" || riderStatus === "returning") {
+        SecureStore.deleteItemAsync("status").catch(() => {});
+        onNext("returnVerification");
+        return;
+      }
+
+      // Customer selected items (selection_made) → check if there are returns
+      if (oStatus === "selection_made") {
+        const hasReturns = payload?.items?.some((i: any) => i.tryStatus === "returned");
+        SecureStore.deleteItemAsync("status").catch(() => {});
+        if (!hasReturns) {
+          SecureStore.deleteItemAsync("startTime").catch(() => {});
+        }
+        onNext(hasReturns ? "returnVerification" : "earnings");
+        return;
+      }
+    };
+
+    emitter.on("orderUpdate", handleOrderUpdate);
+    return () => {
+      emitter.off("orderUpdate", handleOrderUpdate);
+    };
+  }, [onNext]);
+
   // Timer control
   useEffect(() => {
     if (status !== "trying") return;
-
-    setEarnings(BASE_EARNINGS);
 
     const timer = setInterval(() => {
       setTimeElapsed((prev) => {
         if (prev + 1 >= TRY_DURATION) {
           clearInterval(timer);
-          // handleTryPeriodEnd();
           return TRY_DURATION;
         }
         return prev + 1;
@@ -150,23 +189,6 @@ const DeliveryDetails = ({
     }, 1000);
     return () => clearInterval(timer);
   }, [status]);
-
-useEffect(() => {
-  if (status === "trying") {
-    const minutes = Math.floor(timeElapsed / 60);
-
-    // ✅ Always start with base earnings
-    let calc = BASE_EARNINGS;
-
-    // ✅ After 10 minutes, increase earnings by 1 per minute
-    if (minutes >= 10) {
-      const extra = (minutes - 9) * EARNINGS_AFTER_10MIN;
-      calc += extra;
-    }
-
-    setEarnings(calc);
-  }
-}, [timeElapsed, status]);
 
   // 🔹 Expanded handleHandover function
   const handleHandover = async () => {
@@ -176,9 +198,15 @@ useEffect(() => {
         return;
       }
 
+      if (handoverOtp.trim().length !== 4) {
+        Alert.alert("Invalid OTP", "Please enter a valid 4-digit OTP.");
+        return;
+      }
+
       // Call API
       const response = await HandoverPackageApi({
         orderId: orderData.orderId,
+        otp: handoverOtp.trim(),
       });
 
       if (response) {
@@ -196,17 +224,9 @@ useEffect(() => {
     }
   };
 
-  // const handleTryPeriodEnd = () => {
-  //   SecureStore.deleteItemAsync("status");
-  //   SecureStore.deleteItemAsync("startTime");
-  //   Alert.alert("Customer Decision", "Did the customer buy all the clothes?", [
-  //     { text: "Yes, all bought", onPress: () => onNext("earnings") },
-  //     {
-  //       text: "No, some returned",
-  //       onPress: () => onNext("returnVerification"),
-  //     },
-  //   ]);
-  // };
+  // Navigation is now handled by the orderUpdate socket listener above.
+  // When customer makes selection in their app, the backend emits orderUpdate,
+  // and this component auto-navigates to the correct next step.
 
   const handleMap = () => {
     const lat = orderData?.customerLocation?.lat || FALLBACK_LOCATION.lat;
@@ -291,6 +311,19 @@ useEffect(() => {
             />
           </View>
 
+          <View style={styles.infoCard}>
+            <Text style={styles.infoLabel}>Customer Handover OTP</Text>
+            <TextInput
+              style={styles.otpInput}
+              placeholder="Enter 4-digit OTP"
+              placeholderTextColor="#9ca3af"
+              keyboardType="numeric"
+              maxLength={4}
+              value={handoverOtp}
+              onChangeText={setHandoverOtp}
+            />
+          </View>
+
           <TouchableOpacity
             style={styles.primaryButton}
             onPress={handleHandover}
@@ -333,7 +366,7 @@ useEffect(() => {
           </View>
 
           <View style={styles.timerCard}>
-            <AnimatedEarningsCircle earnings={earnings} />
+            <AnimatedEarningsCircle earnings={deliveryEarnings} />
             <View style={styles.timerIconRow}>
               <Ionicons name="hourglass-outline" size={28} color="#fff" />
               <Text style={styles.timerLabel}>Time Elapsed</Text>
@@ -343,7 +376,7 @@ useEffect(() => {
               <View style={[styles.progressBar, { width: `${progress}%` }]} />
             </View>
             <Text style={styles.timerSubtext}>
-              Earn ₹1 for every minute after 10 minutes
+              Your delivery earnings: ₹{deliveryEarnings}
             </Text>
           </View>
 
@@ -682,6 +715,19 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: "#6b7280",
     fontWeight: "500",
+  },
+  otpInput: {
+    backgroundColor: '#fff',
+    borderRadius: 8,
+    paddingVertical: 12,
+    fontSize: 20,
+    fontWeight: '600',
+    textAlign: 'center',
+    letterSpacing: 4,
+    color: '#111827',
+    borderWidth: 1,
+    borderColor: '#d1d5db',
+    marginTop: 8,
   },
 });
 

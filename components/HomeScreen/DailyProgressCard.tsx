@@ -7,6 +7,8 @@ interface DailyProgressCardProps {
   onlineTime?: string;
   orders?: number;
   incentives?: any[];
+  yesterdayEarnings?: number;
+  yesterdayOrders?: number;
 }
 
 const DailyProgressCard: React.FC<DailyProgressCardProps> = ({
@@ -14,6 +16,8 @@ const DailyProgressCard: React.FC<DailyProgressCardProps> = ({
   onlineTime = '0h 0m',
   orders = 0,
   incentives = [],
+  yesterdayEarnings = 0,
+  yesterdayOrders = 0,
 }) => {
   const router = useRouter();
 
@@ -29,7 +33,10 @@ const DailyProgressCard: React.FC<DailyProgressCardProps> = ({
               <Text style={styles.earningsIcon}>₹</Text>
             </View>
             <Text style={styles.statValue}>{formatEarnings(earnings)}</Text>
-            <Text style={styles.statLabel}>Earnings</Text>
+            <Text style={styles.statLabel}>Earnings today</Text>
+            {yesterdayEarnings > 0 && (
+              <Text style={styles.yesterdayText}>Yesterday: {formatEarnings(yesterdayEarnings)}</Text>
+            )}
           </View>
 
           <View style={styles.divider} />
@@ -51,7 +58,10 @@ const DailyProgressCard: React.FC<DailyProgressCardProps> = ({
               <Text style={styles.ordersIcon}>🛍️</Text>
             </View>
             <Text style={styles.statValue}>{orders}</Text>
-            <Text style={styles.statLabel}>Orders</Text>
+            <Text style={styles.statLabel}>Orders today</Text>
+            {yesterdayOrders > 0 && (
+              <Text style={styles.yesterdayText}>Yesterday: {yesterdayOrders}</Text>
+            )}
           </View>
         </View>
 
@@ -129,7 +139,8 @@ const styles = StyleSheet.create({
   timeIcon: { fontSize: 14 },
   ordersIcon: { fontSize: 14 },
   statValue: { fontSize: 24, fontWeight: '700', color: '#1f2937', marginBottom: 4 },
-  statLabel: { fontSize: 14, color: '#6b7280', fontWeight: '500' },
+  statLabel: { fontSize: 13, color: '#6b7280', fontWeight: '500' },
+  yesterdayText: { fontSize: 11, color: '#9ca3af', marginTop: 4 },
   divider: { width: 1, height: 60, backgroundColor: '#e5e7eb', marginHorizontal: 8 },
   orderButton: {
     marginTop: 20,

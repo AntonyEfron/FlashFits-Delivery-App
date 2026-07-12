@@ -205,6 +205,7 @@ const OTPVerificationScreen: React.FC<OTPVerificationScreenProps> = ({
       if (status === 201 || status === 200) {
         await Promise.all([
           SecureStore.setItemAsync("token", data?.token ?? ""),
+          SecureStore.setItemAsync("refreshToken", data?.refreshToken ?? ""),
           SecureStore.setItemAsync("isVerified", String(rider?.isVerified ?? false)),
           SecureStore.setItemAsync("deliveryRiderId", String(rider?._id ?? "")),
         ]);

@@ -32,8 +32,8 @@ const ReachPickup: React.FC<ReachPickupProps> = ({ onNext }) => {
 
   /** 🧭 Dynamic pickup coordinates */
   const pickupCoords = { 
-    lat: orderData?.pickupLocationCorrdinates?.coordinates?.[1] || 9.9675883, 
-    lng: orderData?.pickupLocationCorrdinates?.coordinates?.[0] || 76.2994220 
+    lat: orderData?.pickupLocation?.coordinates?.[1] || 9.9675883, 
+    lng: orderData?.pickupLocation?.coordinates?.[0] || 76.2994220 
   };
 
   /** 🌍 Distance calculator (Haversine formula) */

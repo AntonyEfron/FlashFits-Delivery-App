@@ -285,6 +285,45 @@ const EarningScreen = () => {
         </View>
       )}
 
+      {/* ── This Week's Orders ── */}
+      {currentWeek?.payout?.orders && currentWeek.payout.orders.length > 0 && (
+        <View style={{ marginBottom: 16 }}>
+          <Text style={{ fontSize: 18, fontWeight: '700', color: '#1e293b', marginBottom: 10 }}>
+            🛵 Recent Orders
+          </Text>
+          <View style={{ backgroundColor: 'white', borderRadius: 12, padding: 12 }}>
+            {currentWeek.payout.orders.slice().reverse().map((order, idx) => (
+              <View
+                key={idx}
+                style={{
+                  backgroundColor: '#f8fafc',
+                  borderRadius: 10,
+                  padding: 12,
+                  marginVertical: 4,
+                  flexDirection: 'row',
+                  justifyContent: 'space-between',
+                  alignItems: 'center',
+                }}
+              >
+                <View style={{ flex: 1, paddingRight: 8 }}>
+                  <Text style={{ fontSize: 14, fontWeight: '500', color: '#1e293b' }}>
+                    {order.description || `Order #${order.orderId?.toString().slice(-5)}`}
+                  </Text>
+                  {order.settledAt && (
+                    <Text style={{ fontSize: 11, color: '#94a3b8', marginTop: 2 }}>
+                      {new Date(order.settledAt).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })} • {new Date(order.settledAt).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' })}
+                    </Text>
+                  )}
+                </View>
+                <Text style={{ fontWeight: '700', fontSize: 15, color: order.type === 'credit' ? '#059669' : '#ef4444' }}>
+                  {order.type === 'credit' ? '+' : '-'}₹{order.amount?.toFixed(0)}
+                </Text>
+              </View>
+            ))}
+          </View>
+        </View>
+      )}
+
       {/* ── Past Weeks ── */}
       {history.length > 0 && (
         <View>
@@ -319,11 +358,11 @@ const EarningScreen = () => {
                       ₹{(week.finalAmount || 0).toFixed(0)}
                     </Text>
                     <View style={{ 
-                      backgroundColor: week.status === 'paid' ? '#dcfce7' : '#fef2f2',
+                      backgroundColor: week.status === 'paid' ? '#dcfce7' : week.status === 'finalized' ? '#fef08a' : '#fef2f2',
                       paddingHorizontal: 8, paddingVertical: 2, borderRadius: 6,
                     }}>
-                      <Text style={{ fontSize: 11, fontWeight: '600', color: week.status === 'paid' ? '#166534' : '#991b1b' }}>
-                        {week.status === 'paid' ? 'PAID' : 'FAILED'}
+                      <Text style={{ fontSize: 11, fontWeight: '600', color: week.status === 'paid' ? '#166534' : week.status === 'finalized' ? '#854d0e' : '#991b1b' }}>
+                        {week.status === 'paid' ? 'PAID' : week.status === 'finalized' ? 'PENDING' : 'FAILED'}
                       </Text>
                     </View>
                   </View>

@@ -11,7 +11,7 @@ import {
   KeyboardAvoidingView,
   Platform,
 } from 'react-native';
-import * as ImagePicker from 'expo-image-picker';
+import * as SecureStore from 'expo-secure-store';
 import { MaterialCommunityIcons, Ionicons } from '@expo/vector-icons';
 import { ReturnItemVerificationApi, ReturnVerificationApi } from '../api/orderFlow';
 
@@ -23,6 +23,29 @@ interface ReturnVerificationProps {
 const ReturnVerification: React.FC<ReturnVerificationProps> = ({ onNext, orderId }) => {
   const [image, setImage] = useState<string | null>(null);
   const [otp, setOtp] = useState('');
+  const [trialTime, setTrialTime] = useState<number | null>(null);
+
+  React.useEffect(() => {
+    const fetchTrialTime = async () => {
+      try {
+        const st = await SecureStore.getItemAsync('startTime');
+        if (st) {
+          const elapsed = Math.floor((Date.now() - Number(st)) / 1000);
+          setTrialTime(elapsed);
+          await SecureStore.deleteItemAsync('startTime'); // Cleanup
+        }
+      } catch (err) {
+        console.error("Failed to fetch trial time:", err);
+      }
+    };
+    fetchTrialTime();
+  }, []);
+
+  const formatTime = (sec: number) => {
+    const m = Math.floor(sec / 60);
+    const s = sec % 60;
+    return `${m}:${s.toString().padStart(2, '0')}`;
+  };
 
   // const openCamera = async () => {
   //   const { status } = await ImagePicker.requestCameraPermissionsAsync();
@@ -73,6 +96,16 @@ const ReturnVerification: React.FC<ReturnVerificationProps> = ({ onNext, orderId
         showsVerticalScrollIndicator={false}
         keyboardShouldPersistTaps="handled"
       >
+
+        {/* Trial Time Section */}
+        {trialTime !== null && (
+          <View style={styles.section}>
+            <Text style={styles.sectionLabel}>Trial Phase Completed</Text>
+            <Text style={{ fontSize: 18, color: '#4f46e5', fontWeight: 'bold' }}>
+              Total Trial Time: {formatTime(trialTime)}
+            </Text>
+          </View>
+        )}
 
         {/* OTP Section */}
         <View style={styles.section}>

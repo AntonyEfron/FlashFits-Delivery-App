@@ -46,9 +46,9 @@ export const ReachedCustomerLocationApi = async ({ orderId, latitude, longitude 
   }
 };
 
-export const HandoverPackageApi = async ({ orderId }) => {
+export const HandoverPackageApi = async ({ orderId, otp }) => {
   try {
-    const response = await axiosInstance.post("/deliveryRider/order/handOutProducts", { orderId });
+    const response = await axiosInstance.post("/deliveryRider/order/handOutProducts", { orderId, otp });
     return response.data;
   } catch (error) {
     console.error("❌ HandoverPackageApi:", error.response?.data || error.message);
@@ -105,4 +105,13 @@ export const ReturnItemVerificationApi = async ({ orderId, otp }) => {
   }
 };
 
+export const GetActiveOrderApi = async () => {
+  try {
+    const response = await axiosInstance.get("/deliveryRider/order/active");
+    return response.data;
+  } catch (error) {
+    console.error("❌ GetActiveOrderApi:", error.response?.data || error.message);
+    throw error;
+  }
+};
 

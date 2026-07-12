@@ -18,6 +18,7 @@ import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { submitPersonalDetails, uploadDocuments, submitBankDetails, getZones } from "../api/registration";
+import { router } from 'expo-router';
 
 const bankNames = [
   "State Bank of India (SBI)",
@@ -70,8 +71,16 @@ const DeliveryPartnerEnrollment = () => {
   const getZonesData = async () => {
     try {
       const response = await getZones();
-      console.log(response.data);
-      setZones(response.data);
+      console.log("Zones response:", response);
+      if (response?.data?.zones && Array.isArray(response.data.zones)) {
+        setZones(response.data.zones);
+      } else if (response?.data && Array.isArray(response.data)) {
+        setZones(response.data);
+      } else if (Array.isArray(response)) {
+        setZones(response);
+      } else {
+        console.warn("Unexpected zones response format:", response);
+      }
     } catch (error) {
       console.error("Error fetching zones:", error.response?.data || error.message);
     }
@@ -94,7 +103,6 @@ const DeliveryPartnerEnrollment = () => {
     { num: 2, title: 'Documents', icon: 'document-text' },
     { num: 3, title: 'Training', icon: 'school' },
     { num: 4, title: 'Bank', icon: 'wallet' },
-    { num: 5, title: 'Payment', icon: 'card' },
   ];
 
   const calculateAge = (birthDate: Date) => {
@@ -211,8 +219,11 @@ const DeliveryPartnerEnrollment = () => {
 
         // ✅ handle both success cases
         if (response?.success || response?.status === 200) {
-          Alert.alert('Success', 'Bank details submitted successfully!');
-          setStep(5);
+          Alert.alert(
+            'Success',
+            'Bank details submitted successfully! Your account is now active.',
+            [{ text: 'OK', onPress: () => router.replace('/(home)') }]
+          );
         } else {
           throw new Error(response?.message || 'Unexpected response');
         }
@@ -711,43 +722,6 @@ const DeliveryPartnerEnrollment = () => {
           </View>
         </Modal>
 
-        {/* Step 5: Payment */}
-        {step === 5 && (
-          <View style={styles.card}>
-            <View style={styles.cardHeader}>
-              <Ionicons name="card" size={24} color="#2563eb" />
-              <Text style={styles.cardTitle}>Registration Fee</Text>
-            </View>
-
-            <View style={styles.paymentBox}>
-              <View style={styles.paymentHeader}>
-                <Ionicons name="shield-checkmark" size={32} color="white" />
-                <Text style={styles.paymentLabel}>One-Time Fee</Text>
-              </View>
-              <Text style={styles.paymentAmount}>₹199</Text>
-              <View style={styles.paymentFeatures}>
-                <View style={styles.featureItem}>
-                  <Ionicons name="checkmark-circle" size={20} color="#dcfce7" />
-                  <Text style={styles.featureText}>Account activation</Text>
-                </View>
-                <View style={styles.featureItem}>
-                  <Ionicons name="checkmark-circle" size={20} color="#dcfce7" />
-                  <Text style={styles.featureText}>Training materials</Text>
-                </View>
-                <View style={styles.featureItem}>
-                  <Ionicons name="checkmark-circle" size={20} color="#dcfce7" />
-                  <Text style={styles.featureText}>Partner kit</Text>
-                </View>
-              </View>
-              <Text style={styles.paymentNote}>Non-refundable registration fee</Text>
-            </View>
-
-            <TouchableOpacity onPress={handlePayment} style={styles.paymentButton}>
-              <Ionicons name="lock-closed" size={20} color="white" />
-              <Text style={styles.paymentButtonText}>Proceed to Secure Payment</Text>
-            </TouchableOpacity>
-          </View>
-        )}
         {loading && (
           <View style={styles.loaderOverlay}>
             <ActivityIndicator size="large" color="#2563eb" />
@@ -756,7 +730,6 @@ const DeliveryPartnerEnrollment = () => {
         )}
 
 
-        {/* Navigation */}
         <View style={styles.navigation}>
           {step > 1 && (
             <TouchableOpacity onPress={prevStep} style={styles.backBtn}>
@@ -764,10 +737,15 @@ const DeliveryPartnerEnrollment = () => {
               <Text style={styles.backText}>Back</Text>
             </TouchableOpacity>
           )}
-          {step < 5 && (
+          {step < 4 ? (
             <TouchableOpacity onPress={nextStep} style={styles.nextBtn}>
               <Text style={styles.nextText}>Continue</Text>
               <Ionicons name="chevron-forward" size={20} color="white" />
+            </TouchableOpacity>
+          ) : (
+            <TouchableOpacity onPress={nextStep} style={styles.nextBtn}>
+              <Text style={styles.nextText}>Submit & Finish</Text>
+              <Ionicons name="checkmark" size={20} color="white" />
             </TouchableOpacity>
           )}
         </View>

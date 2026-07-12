@@ -24,13 +24,16 @@ try {
 try {
   if (Notifications) {
     Notifications.setNotificationHandler({
-      handleNotification: async () => ({
-        shouldShowAlert: true,
-        shouldPlaySound: true,
-        shouldSetBadge: false,
-        shouldShowBanner: true,
-        shouldShowList: true,
-      }),
+      handleNotification: async (notification) => {
+        const isSilent = notification.request.content.data?.silent === true;
+        return {
+          shouldShowAlert: true,
+          shouldPlaySound: !isSilent,
+          shouldSetBadge: false,
+          shouldShowBanner: true,
+          shouldShowList: true,
+        };
+      },
     });
   }
 } catch (e) {

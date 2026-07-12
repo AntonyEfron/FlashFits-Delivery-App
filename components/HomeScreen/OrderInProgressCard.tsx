@@ -3,6 +3,7 @@ import { View, Text, TouchableOpacity, StyleSheet, ActivityIndicator } from "rea
 import * as SecureStore from "expo-secure-store";
 import { useRouter } from "expo-router";
 import { Package, Truck } from "lucide-react-native";
+import { emitter } from "../../config/socketConfig";
 
 const OrderInProgressCard = () => {
   const [order, setOrder] = useState<any>(null);
@@ -16,6 +17,8 @@ const OrderInProgressCard = () => {
         if (storedOrder) {
           const orderData = JSON.parse(storedOrder);
           setOrder(orderData);
+        } else {
+          setOrder(null);
         }
       } catch (error) {
         console.error("Failed to load order:", error);
@@ -24,6 +27,11 @@ const OrderInProgressCard = () => {
       }
     };
     fetchOrder();
+
+    emitter.on("orderSynced", fetchOrder);
+    return () => {
+      emitter.off("orderSynced", fetchOrder);
+    };
   }, []);
 
   const handleContinueOrder = async () => {

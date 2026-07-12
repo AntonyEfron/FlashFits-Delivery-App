@@ -19,7 +19,7 @@ type Props = {
 
 export default function ReachReturnLocation({ onNext, order }: Props) {
   const [loading, setLoading] = useState(false);
-  const coordinates = order?.pickupLocation?.coordinates;
+  const coordinates = order?.pickupLocation?.coordinates || order?.merchantId?.address?.location?.coordinates;
   console.log(order, "order");
 
   console.log(coordinates, "coordinates");
