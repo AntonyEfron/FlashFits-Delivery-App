@@ -80,7 +80,7 @@ const ReachPickup: React.FC<ReachPickupProps> = ({ onNext }) => {
 
       const result = await ReachPickUpLocation({ orderId, coordinates: pickupCoords });
       if (result) {
-        await SecureStore.setItemAsync("orderStep", JSON.stringify("2"));
+        await SecureStore.setItemAsync("orderStep", "2");
         Alert.alert("Success", "Reached pickup location confirmed.");
         onNext();
       }

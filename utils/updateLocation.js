@@ -122,9 +122,39 @@ export const flushLocationQueue = async () => {
   }
 };
 
+// ── Immediate Location Update (Single Shot) ──
+export const sendImmediateLocation = async (riderId) => {
+  if (!riderId) return;
+  try {
+    const { status } = await Location.getForegroundPermissionsAsync();
+    if (status !== "granted") return;
+
+    const loc = await Location.getCurrentPositionAsync({
+      accuracy: Location.Accuracy.Balanced,
+    });
+    if (loc?.coords) {
+      const { latitude, longitude } = loc.coords;
+      console.log("📍 Immediate location update sent:", latitude, longitude);
+      sendRiderLocation(riderId, latitude, longitude);
+
+      // Also send via REST API for reliability
+      axiosInstance.post("/deliveryRider/order/updateLocation", {
+        lat: latitude,
+        lng: longitude,
+        timestamp: Date.now(),
+      }).catch((e) => console.log("Immediate REST loc sync non-fatal:", e.message));
+    }
+  } catch (err) {
+    console.warn("Could not send immediate location:", err.message);
+  }
+};
+
 // ── 3. Start Location Tracking ──
 export const startLocationTracking = async (riderId) => {
   if (!riderId) return false;
+
+  // Immediately broadcast current location so rider is added to Redis Geo right away
+  sendImmediateLocation(riderId);
 
   // Request permissions in sequence: Foreground then Background
   const { status: foregroundStatus } = await Location.requestForegroundPermissionsAsync();
@@ -246,10 +276,18 @@ export const getCurrentLocation = async () => {
       return null;
     }
 
-    const location = await Location.getCurrentPositionAsync({
-      accuracy: Location.Accuracy.High,
-    });
+    // Safe timeout race without rejecting promises (prevents native JSI crash)
+    const timeoutPromise = new Promise((resolve) => setTimeout(() => resolve(null), 4000));
+    const locPromise = Location.getCurrentPositionAsync({
+      accuracy: Location.Accuracy.Balanced,
+    }).catch(() => null);
 
+    let location = await Promise.race([locPromise, timeoutPromise]);
+    if (!location) {
+      location = await Location.getLastKnownPositionAsync().catch(() => null);
+    }
+
+    if (!location?.coords) return null;
     const { latitude, longitude } = location.coords;
     return { latitude, longitude };
   } catch (error) {

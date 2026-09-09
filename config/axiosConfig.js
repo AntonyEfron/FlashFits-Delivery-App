@@ -4,8 +4,13 @@ import * as SecureStore from "expo-secure-store";
 // import {BACKEND_URL} from "../app.config.ts";
 import Constants from "expo-constants";
 
+const BACKEND_URL =
+  Constants.expoConfig?.extra?.BACKEND_URL ||
+  Constants.manifest?.extra?.BACKEND_URL ||
+  "http://192.168.29.230:5000";
+
 const api = axios.create({
-  baseURL: `${Constants.expoConfig.extra.BACKEND_URL}/api/`,
+  baseURL: `${BACKEND_URL}/api/`,
   timeout: 10000,
 });
 
@@ -70,7 +75,7 @@ api.interceptors.response.use(
         const refreshToken = await SecureStore.getItemAsync('refreshToken');
         if (!refreshToken) throw new Error("No refresh token");
 
-        const baseURL = `${Constants.expoConfig.extra.BACKEND_URL}/api/`;
+        const baseURL = `${BACKEND_URL}/api/`;
         const res = await axios.post(`${baseURL}deliveryRider/auth/refresh`, { refreshToken });
         
         const token = res.data?.token || res.data?.data?.token;

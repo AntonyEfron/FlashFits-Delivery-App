@@ -23,16 +23,11 @@ export default function ReachReturnLocation({ onNext, order }: Props) {
   console.log(order, "order");
 
   console.log(coordinates, "coordinates");
+  const lat = coordinates?.[1] || 9.9675883;
+  const lng = coordinates?.[0] || 76.2994220;
  
   const handleOpenInGoogleMaps = () => {
     console.log("🚀 ~ ReachReturnLocation ~ coordinates:", coordinates);
-    if (!coordinates || coordinates.length < 2) {
-      Alert.alert("Error", "Coordinates not available.");
-      return;
-    }
-
-    const lat = coordinates[1];
-    const lng = coordinates[0];
 
     // Google Maps link
     const url = `https://www.google.com/maps?q=${lat},${lng}`;
@@ -63,11 +58,6 @@ export default function ReachReturnLocation({ onNext, order }: Props) {
 
   const handleReachLocation = async () => {
     try {
-      if (!coordinates || coordinates.length < 2) {
-        Alert.alert("Error", "Return location coordinates not available.");
-        return;
-      }
-
       setLoading(true);
       const currentLoc = await getCurrentLocation();
 
@@ -77,8 +67,8 @@ export default function ReachReturnLocation({ onNext, order }: Props) {
         return;
       }
 
-      const returnLat = coordinates[1];
-      const returnLng = coordinates[0];
+      const returnLat = lat;
+      const returnLng = lng;
 
       const distance = getDistanceFromLatLonInMeters(
         currentLoc.latitude,
@@ -110,7 +100,7 @@ export default function ReachReturnLocation({ onNext, order }: Props) {
       });
 
       if (result) {
-        await SecureStore.setItemAsync("orderStep", JSON.stringify("8"));
+        await SecureStore.setItemAsync("orderStep", "8");
         Alert.alert("Success", "Reached return location confirmed.");
         onNext();
       }
@@ -140,9 +130,13 @@ export default function ReachReturnLocation({ onNext, order }: Props) {
 
         <View style={styles.addressRow}>
           <View>
-            <Text style={styles.addressTitle}>Warehouse Hub</Text>
+            <Text style={styles.addressTitle}>
+              {order?.shopName ? order.shopName : "Shop name not available"}
+            </Text>
             <Text style={styles.addressDetails}>
-              456 Industrial Park, Sector 5
+              {order?.pickupAddress && order.pickupAddress !== "null"
+                ? order.pickupAddress
+                : "Pickup address not available"}
             </Text>
           </View>
         </View>

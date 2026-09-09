@@ -37,8 +37,16 @@ const OrderInProgressCard = () => {
   const handleContinueOrder = async () => {
     const stepValue = await SecureStore.getItemAsync("orderStep");
 
-    const step = stepValue ? parseInt(JSON.parse(stepValue)) : 0;
-    console.log(step,'step3e89');
+    let step = 0;
+    if (stepValue) {
+      try {
+        const raw = typeof stepValue === "string" && stepValue.startsWith('"') ? JSON.parse(stepValue) : stepValue;
+        step = parseInt(String(raw), 10) || 0;
+      } catch {
+        step = parseInt(String(stepValue), 10) || 0;
+      }
+    }
+    console.log(step, 'step3e89');
     
 
     // Navigate to order flow and pass step as param
@@ -52,6 +60,11 @@ const OrderInProgressCard = () => {
 
   if (!order) return null; // no active order → don't render anything
 
+  const totalEarnings = (order?.originalDeliveryCharge ?? order?.finalBilling?.deliveryCharge ?? order?.deliveryCharge ?? 0)
+    + (order?.originalReturnCharge ?? order?.returnCharge ?? 0)
+    + (order?.finalBilling?.deliveryTip ?? order?.deliveryTip ?? order?.tip ?? 0)
+    || order?.deliveryAmount || 0;
+
   return (
     <TouchableOpacity style={styles.card} onPress={handleContinueOrder}>
       <View style={styles.iconContainer}>
@@ -60,7 +73,7 @@ const OrderInProgressCard = () => {
       <View style={styles.textContainer}>
         <Text style={styles.title}>Order In Progress</Text>
         <Text style={styles.subtitle}>{order.shopName}</Text>
-        <Text style={styles.amount}>₹{order.deliveryAmount}</Text>
+        <Text style={styles.amount}>₹{totalEarnings}</Text>
       </View>
       <Package size={24} color="#2563EB" />
     </TouchableOpacity>

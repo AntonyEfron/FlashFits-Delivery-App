@@ -100,7 +100,7 @@ export default function ReachDeliveryLocation({ onNext }: Props) {
       });
 
       if (response) {
-        await SecureStore.setItemAsync("orderStep", JSON.stringify("4"));
+        await SecureStore.setItemAsync("orderStep", "4");
         Alert.alert("Success", "Customer location marked successfully!");
         onNext();
       }

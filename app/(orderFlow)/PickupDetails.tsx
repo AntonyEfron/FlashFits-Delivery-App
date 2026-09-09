@@ -50,7 +50,7 @@ const PickupDetails: React.FC<{ onNext: () => void }> = ({ onNext }) => {
         otp: code,
       });
       if (res) {
-        await SecureStore.setItemAsync("orderStep", JSON.stringify("3"));
+        await SecureStore.setItemAsync("orderStep", "3");
         onNext();
       }
     } catch (error) {

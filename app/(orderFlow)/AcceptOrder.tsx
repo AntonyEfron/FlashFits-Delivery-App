@@ -7,410 +7,561 @@ import {
   ActivityIndicator,
   Alert,
   Animated,
-  Dimensions,
 } from "react-native";
-import { Modalize } from "react-native-modalize";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import * as SecureStore from "expo-secure-store";
 import { AcceptOrderApi } from "../api/orderFlow";
 import { joinOrderRoom } from "../../config/socketConfig";
-import { emitter } from "../../config/socketConfig";
 import { stopOrderAlert } from "../../utils/alertManager";
-
-const { width } = Dimensions.get("window");
 
 interface AcceptOrderProps {
   onNext: () => void;
+  order?: any;
 }
 
-const AcceptOrder: React.FC<AcceptOrderProps> = ({ onNext }) => {
-  const modalRef = useRef<Modalize>(null);
+const AcceptOrder: React.FC<AcceptOrderProps> = ({ onNext, order: propOrder }) => {
+  const insets = useSafeAreaInsets();
   const [loading, setLoading] = useState(false);
-  const [order, setOrder] = useState<any>(null);
-  
+  const [order, setOrder] = useState<any>(propOrder || null);
+  const [alertDismissed, setAlertDismissed] = useState(false);
+
   // Animation values
   const pulseAnim = useRef(new Animated.Value(1)).current;
-  const fadeAnim = useRef(new Animated.Value(0)).current;
-  const slideAnim = useRef(new Animated.Value(30)).current;
+  const slideAnim = useRef(new Animated.Value(300)).current;
+  const backdropAnim = useRef(new Animated.Value(0)).current;
 
-  console.log(order, "Order Data");
-
-  // Pulse animation for the new order indicator
+  // Sync prop order
   useEffect(() => {
-    Animated.loop(
+    if (propOrder) {
+      setOrder(propOrder);
+    }
+  }, [propOrder]);
+
+  // Pulse animation for the NEW order indicator badge
+  useEffect(() => {
+    const loop = Animated.loop(
       Animated.sequence([
         Animated.timing(pulseAnim, {
-          toValue: 1.1,
-          duration: 800,
+          toValue: 1.15,
+          duration: 650,
           useNativeDriver: true,
         }),
         Animated.timing(pulseAnim, {
           toValue: 1,
-          duration: 800,
+          duration: 650,
           useNativeDriver: true,
         }),
       ])
-    ).start();
-  }, []);
+    );
+    loop.start();
+    return () => loop.stop();
+  }, [pulseAnim]);
 
-  // Fade in animation
+  // Slide up bottom sheet and fade in backdrop on mount
   useEffect(() => {
     Animated.parallel([
-      Animated.timing(fadeAnim, {
+      Animated.timing(backdropAnim, {
         toValue: 1,
-        duration: 400,
+        duration: 250,
         useNativeDriver: true,
       }),
-      Animated.timing(slideAnim, {
+      Animated.spring(slideAnim, {
         toValue: 0,
-        duration: 400,
+        damping: 24,
+        mass: 0.8,
+        stiffness: 240,
         useNativeDriver: true,
       }),
     ]).start();
-  }, [order]);
+  }, [slideAnim, backdropAnim]);
 
-  // Open the modal when the component mounts
-  useEffect(() => {
-    const timer = setTimeout(() => modalRef.current?.open(), 100);
-    return () => clearTimeout(timer);
-  }, []);
-
-  // Load stored order data
+  // Load stored order data as fallback if prop wasn't provided
   useEffect(() => {
     const loadOrder = async () => {
-      const storedOrder = await SecureStore.getItemAsync("acceptOrder");
-      
-      if (storedOrder) {
-        const parsedOrder = JSON.parse(storedOrder);
-        console.log("📦 Loaded order data from SecureStore:", parsedOrder);
-        setOrder(parsedOrder);
-        await SecureStore.setItemAsync("currentOrderId", parsedOrder.orderId);
+      if (!order) {
+        try {
+          const storedOrder = await SecureStore.getItemAsync("acceptOrder");
+          if (storedOrder) {
+            const parsedOrder = JSON.parse(storedOrder);
+            setOrder(parsedOrder);
+            if (parsedOrder.orderId) {
+              await SecureStore.setItemAsync("currentOrderId", parsedOrder.orderId);
+            }
+          }
+        } catch (err) {
+          console.error("Failed to load stored order in AcceptOrder:", err);
+        }
       }
     };
     loadOrder();
+  }, [order]);
+
+  // Stop alert sound/vibration when unmounting
+  useEffect(() => {
+    return () => {
+      stopOrderAlert();
+    };
   }, []);
+
+  const handleDismissAlert = () => {
+    stopOrderAlert();
+    setAlertDismissed(true);
+  };
 
   const handleAcceptOrder = async () => {
     try {
-      // Stop the alerting sound and vibration immediately
       stopOrderAlert();
 
-      setLoading(true);
-
-      if (!order) {
+      if (!order || !order.orderId) {
         Alert.alert("Error", "Missing order information.");
         return;
       }
 
-      console.log(order,'y879');
-      
+      setLoading(true);
 
       const result = await AcceptOrderApi(order.orderId);
-      console.log("✅ Order accepted:", result);
-      if (result){
-      await SecureStore.setItemAsync("orderStep", JSON.stringify('1'));
+      if (result) {
+        const nextStep =
+          order?.orderStatus === "packed" || result?.order?.orderStatus === "packed"
+            ? "2"
+            : "1";
+        await SecureStore.setItemAsync("orderStep", String(nextStep));
       }
       await joinOrderRoom(order.orderId);
 
-      modalRef.current?.close();
-      onNext();
+      // Slide down and transition to next step
+      Animated.parallel([
+        Animated.timing(backdropAnim, {
+          toValue: 0,
+          duration: 180,
+          useNativeDriver: true,
+        }),
+        Animated.timing(slideAnim, {
+          toValue: 400,
+          duration: 180,
+          useNativeDriver: true,
+        }),
+      ]).start(() => {
+        onNext();
+      });
     } catch (error) {
       console.error("❌ Failed to accept order:", error);
       Alert.alert("Failed", "Could not accept the order. Try again.");
-    } finally {
       setLoading(false);
     }
   };
 
+  // Earnings calculations
+  const deliveryCharge =
+    order?.originalDeliveryCharge ??
+    order?.finalBilling?.deliveryCharge ??
+    order?.deliveryCharge ??
+    order?.deliveryAmount ??
+    0;
+  const returnCharge =
+    order?.originalReturnCharge ?? order?.returnCharge ?? 0;
+  const tipCharge =
+    order?.finalBilling?.deliveryTip ??
+    order?.deliveryTip ??
+    order?.tip ??
+    0;
+  const totalEarnings =
+    (deliveryCharge + returnCharge + tipCharge) || order?.deliveryAmount || 0;
+
   return (
-    <Modalize
-      ref={modalRef}
-      adjustToContentHeight
-      handlePosition="inside"
-      modalStyle={styles.modal}
-      handleStyle={styles.handle}
-      overlayStyle={styles.overlay}
-      closeOnOverlayTap={false}
-    >
-      <View style={styles.container}>
-        {/* Header with pulse animation */}
-        <View style={styles.header}>
-          <Animated.View
-            style={[
-              styles.badge,
-              {
-                transform: [{ scale: pulseAnim }],
-              },
-            ]}
-          >
-            <Text style={styles.badgeText}>NEW</Text>
-          </Animated.View>
-          <Text style={styles.title}>New Order Request</Text>
-          <Text style={styles.subtitle}>Review and accept the delivery</Text>
+    <View style={styles.screenWrapper}>
+      {/* Dimmed backdrop overlay */}
+      <Animated.View style={[styles.backdrop, { opacity: backdropAnim }]} />
+
+      {/* Clean, Non-Scrolling Bottom Sheet */}
+      <Animated.View
+        style={[
+          styles.sheet,
+          {
+            transform: [{ translateY: slideAnim }],
+            paddingBottom: Math.max(insets.bottom, 16),
+          },
+        ]}
+      >
+        {/* Drag handle */}
+        <View style={styles.handleContainer}>
+          <View style={styles.handle} />
         </View>
 
         {order ? (
-          <Animated.View
-            style={[
-              styles.content,
-              {
-                opacity: fadeAnim,
-                transform: [{ translateY: slideAnim }],
-              },
-            ]}
-          >
-            {/* Order Card */}
-            <View style={styles.card}>
-              {/* Pickup Section */}
-              <View style={styles.section}>
-                <View style={styles.iconContainer}>
-                  <View style={styles.pickupIcon}>
-                    <Text style={styles.iconText}>📍</Text>
-                  </View>
-                </View>
-                <View style={styles.sectionContent}>
-                  <Text style={styles.label}>Pickup Location</Text>
-                  <Text style={styles.value}>
-                    {order.shopName || "Unknown Shop"}
-                  </Text>
-                </View>
+          <View style={styles.content}>
+            {/* Header Row: Badge + Title on Left, Order ID on Right */}
+            <View style={styles.headerRow}>
+              <View style={styles.headerLeft}>
+                <Animated.View
+                  style={[
+                    styles.badge,
+                    {
+                      transform: [{ scale: pulseAnim }],
+                    },
+                  ]}
+                >
+                  <Text style={styles.badgeText}>NEW</Text>
+                </Animated.View>
+                <Text style={styles.headerTitle}>New Delivery Offer</Text>
               </View>
 
-              {/* Divider */}
-              <View style={styles.divider} />
-
-              {/* Delivery Amount Section */}
-              <View style={styles.section}>
-                <View style={styles.iconContainer}>
-                  <View style={styles.amountIcon}>
-                    <Text style={styles.iconText}>💰</Text>
-                  </View>
-                </View>
-                <View style={styles.sectionContent}>
-                  <Text style={styles.label}>Delivery Earnings</Text>
-                  <Text style={styles.amountValue}>
-                    ₹{order.deliveryAmount || 0}
-                  </Text>
-                </View>
-              </View>
-
-              {/* Order ID (subtle) */}
-              <View style={styles.orderIdContainer}>
-                <Text style={styles.orderId}>
-                  Order ID: {order.orderId?.slice(-8) || "N/A"}
+              <View style={styles.orderIdBadge}>
+                <Text style={styles.orderIdText}>
+                  #{order.orderId ? order.orderId.slice(-6).toUpperCase() : "N/A"}
                 </Text>
               </View>
             </View>
 
-            {/* Action Buttons */}
-            <View style={styles.actions}>
+            {/* Total Earnings Card */}
+            <View style={styles.earningsCard}>
+              <View style={styles.earningsMain}>
+                <Text style={styles.earningsLabel}>TOTAL EARNINGS</Text>
+                <Text style={styles.earningsAmount}>₹{totalEarnings}</Text>
+              </View>
+
+              {/* Compact Breakdown Tags */}
+              <View style={styles.breakdownContainer}>
+                {deliveryCharge > 0 && (
+                  <View style={styles.breakdownTag}>
+                    <Text style={styles.breakdownText}>🚴 ₹{deliveryCharge}</Text>
+                  </View>
+                )}
+                {returnCharge > 0 && (
+                  <View style={[styles.breakdownTag, styles.returnTag]}>
+                    <Text style={[styles.breakdownText, styles.returnText]}>
+                      🔄 ₹{returnCharge}
+                    </Text>
+                  </View>
+                )}
+                {tipCharge > 0 && (
+                  <View style={[styles.breakdownTag, styles.tipTag]}>
+                    <Text style={[styles.breakdownText, styles.tipText]}>
+                      💝 +₹{tipCharge} tip
+                    </Text>
+                  </View>
+                )}
+              </View>
+            </View>
+
+            {/* Pickup Location Card */}
+            <View style={styles.pickupCard}>
+              <View style={styles.pickupIconBox}>
+                <Text style={styles.pickupIcon}>📍</Text>
+              </View>
+
+              <View style={styles.pickupDetails}>
+                <Text style={styles.pickupLabel}>PICKUP FROM</Text>
+                <Text style={styles.shopName} numberOfLines={1}>
+                  {order.shopName || "Store / Merchant"}
+                </Text>
+                {order.pickupAddress && order.pickupAddress !== "null" ? (
+                  <Text style={styles.pickupAddress} numberOfLines={1}>
+                    {order.pickupAddress}
+                  </Text>
+                ) : null}
+              </View>
+
+              {order.deliveryDistance ? (
+                <View style={styles.distanceBadge}>
+                  <Text style={styles.distanceText}>{order.deliveryDistance}</Text>
+                </View>
+              ) : null}
+            </View>
+
+            {/* Action Bar (1 Single Row - No Scrolling!) */}
+            <View style={styles.actionsRow}>
+              {!alertDismissed && (
+                <TouchableOpacity
+                  style={styles.muteButton}
+                  onPress={handleDismissAlert}
+                  activeOpacity={0.7}
+                >
+                  <Text style={styles.muteButtonText}>🔇 Mute</Text>
+                </TouchableOpacity>
+              )}
+
               <TouchableOpacity
-                style={[styles.button, styles.acceptButton]}
+                style={[
+                  styles.acceptButton,
+                  !alertDismissed && styles.acceptButtonWithMute,
+                ]}
                 onPress={handleAcceptOrder}
                 disabled={loading}
-                activeOpacity={0.8}
+                activeOpacity={0.85}
               >
                 {loading ? (
                   <ActivityIndicator color="#fff" size="small" />
                 ) : (
                   <>
-                    <Text style={styles.buttonText}>Accept Order</Text>
-                    <Text style={styles.buttonIcon}>✓</Text>
+                    <Text style={styles.acceptButtonText}>Accept Order</Text>
+                    <Text style={styles.acceptButtonIcon}>✓</Text>
                   </>
                 )}
               </TouchableOpacity>
-
-              {/* Optional: Decline button
-              <TouchableOpacity
-                style={[styles.button, styles.declineButton]}
-                disabled={loading}
-                activeOpacity={0.8}
-              >
-                <Text style={styles.declineButtonText}>Decline</Text>
-              </TouchableOpacity>
-              */}
             </View>
-          </Animated.View>
+          </View>
         ) : (
           <View style={styles.loadingContainer}>
             <ActivityIndicator size="large" color="#16a34a" />
-            <Text style={styles.loadingText}>Loading order details...</Text>
+            <Text style={styles.loadingText}>Fetching order details...</Text>
           </View>
         )}
-      </View>
-    </Modalize>
+      </Animated.View>
+    </View>
   );
 };
 
 const styles = StyleSheet.create({
-  modal: {
-    backgroundColor: "#f8fafc",
+  screenWrapper: {
+    flex: 1,
+    justifyContent: "flex-end",
+    backgroundColor: "transparent",
+  },
+  backdrop: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: "rgba(15, 23, 42, 0.55)",
+  },
+  sheet: {
+    backgroundColor: "#ffffff",
     borderTopLeftRadius: 24,
     borderTopRightRadius: 24,
+    paddingHorizontal: 16,
+    paddingTop: 8,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: -4 },
+    shadowOpacity: 0.15,
+    shadowRadius: 16,
+    elevation: 20,
+  },
+  handleContainer: {
+    alignItems: "center",
+    paddingVertical: 4,
   },
   handle: {
     backgroundColor: "#cbd5e1",
-    width: 40,
-    height: 5,
+    width: 36,
+    height: 4,
+    borderRadius: 2,
   },
-  overlay: {
-    backgroundColor: "rgba(0, 0, 0, 0.6)",
+  content: {
+    paddingTop: 4,
   },
-  container: {
-    padding: 24,
-    paddingBottom: 32,
-  },
-  header: {
+  headerRow: {
+    flexDirection: "row",
     alignItems: "center",
-    marginBottom: 24,
+    justifyContent: "space-between",
+    marginBottom: 10,
+  },
+  headerLeft: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
   },
   badge: {
     backgroundColor: "#16a34a",
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 20,
-    marginBottom: 12,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 12,
   },
   badgeText: {
     color: "#fff",
-    fontSize: 12,
-    fontWeight: "700",
-    letterSpacing: 1,
+    fontSize: 10,
+    fontWeight: "800",
+    letterSpacing: 0.8,
   },
-  title: {
-    fontSize: 26,
-    fontWeight: "700",
-    color: "#0f172a",
-    marginBottom: 6,
-  },
-  subtitle: {
-    fontSize: 15,
-    color: "#64748b",
-    fontWeight: "400",
-  },
-  content: {
-    width: "100%",
-  },
-  card: {
-    backgroundColor: "#fff",
-    borderRadius: 16,
-    padding: 20,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.08,
-    shadowRadius: 12,
-    elevation: 4,
-    marginBottom: 20,
-  },
-  section: {
-    flexDirection: "row",
-    alignItems: "center",
-  },
-  iconContainer: {
-    marginRight: 16,
-  },
-  pickupIcon: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
-    backgroundColor: "#dbeafe",
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  amountIcon: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
-    backgroundColor: "#dcfce7",
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  iconText: {
-    fontSize: 22,
-  },
-  sectionContent: {
-    flex: 1,
-  },
-  label: {
-    fontSize: 13,
-    color: "#64748b",
-    fontWeight: "500",
-    marginBottom: 4,
-    textTransform: "uppercase",
-    letterSpacing: 0.5,
-  },
-  value: {
-    fontSize: 17,
-    color: "#0f172a",
-    fontWeight: "600",
-  },
-  amountValue: {
-    fontSize: 24,
-    color: "#16a34a",
-    fontWeight: "700",
-  },
-  divider: {
-    height: 1,
-    backgroundColor: "#e2e8f0",
-    marginVertical: 16,
-  },
-  orderIdContainer: {
-    marginTop: 12,
-    paddingTop: 12,
-    borderTopWidth: 1,
-    borderTopColor: "#f1f5f9",
-  },
-  orderId: {
-    fontSize: 12,
-    color: "#94a3b8",
-    textAlign: "center",
-  },
-  actions: {
-    gap: 12,
-  },
-  button: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    paddingVertical: 16,
-    borderRadius: 12,
-    gap: 8,
-  },
-  acceptButton: {
-    backgroundColor: "#16a34a",
-    shadowColor: "#16a34a",
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
-    elevation: 6,
-  },
-  buttonText: {
-    color: "#fff",
+  headerTitle: {
     fontSize: 17,
     fontWeight: "700",
+    color: "#0f172a",
   },
-  buttonIcon: {
-    color: "#fff",
-    fontSize: 20,
-    fontWeight: "700",
-  },
-  declineButton: {
+  orderIdBadge: {
     backgroundColor: "#f1f5f9",
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 8,
     borderWidth: 1,
     borderColor: "#e2e8f0",
   },
-  declineButtonText: {
+  orderIdText: {
+    fontSize: 11,
+    fontWeight: "700",
     color: "#64748b",
+  },
+  earningsCard: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    backgroundColor: "#f0fdf4",
+    borderRadius: 14,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    borderWidth: 1,
+    borderColor: "#bbf7d0",
+    marginBottom: 8,
+  },
+  earningsMain: {
+    justifyContent: "center",
+  },
+  earningsLabel: {
+    fontSize: 10,
+    fontWeight: "700",
+    color: "#15803d",
+    letterSpacing: 0.6,
+    marginBottom: 1,
+  },
+  earningsAmount: {
+    fontSize: 26,
+    fontWeight: "800",
+    color: "#16a34a",
+  },
+  breakdownContainer: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    justifyContent: "flex-end",
+    gap: 4,
+    maxWidth: "55%",
+  },
+  breakdownTag: {
+    backgroundColor: "#dcfce7",
+    paddingHorizontal: 7,
+    paddingVertical: 3,
+    borderRadius: 6,
+    borderWidth: 1,
+    borderColor: "#86efac",
+  },
+  breakdownText: {
+    fontSize: 11,
+    fontWeight: "700",
+    color: "#15803d",
+  },
+  returnTag: {
+    backgroundColor: "#eff6ff",
+    borderColor: "#bfdbfe",
+  },
+  returnText: {
+    color: "#2563eb",
+  },
+  tipTag: {
+    backgroundColor: "#fffbeb",
+    borderColor: "#fde68a",
+  },
+  tipText: {
+    color: "#b45309",
+  },
+  pickupCard: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "#f8fafc",
+    borderRadius: 14,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    borderWidth: 1,
+    borderColor: "#e2e8f0",
+    marginBottom: 10,
+  },
+  pickupIconBox: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: "#dbeafe",
+    alignItems: "center",
+    justifyContent: "center",
+    marginRight: 10,
+  },
+  pickupIcon: {
+    fontSize: 18,
+  },
+  pickupDetails: {
+    flex: 1,
+    justifyContent: "center",
+  },
+  pickupLabel: {
+    fontSize: 9,
+    fontWeight: "700",
+    color: "#64748b",
+    letterSpacing: 0.6,
+    marginBottom: 1,
+  },
+  shopName: {
+    fontSize: 15,
+    fontWeight: "700",
+    color: "#0f172a",
+  },
+  pickupAddress: {
+    fontSize: 11,
+    color: "#64748b",
+    marginTop: 1,
+  },
+  distanceBadge: {
+    backgroundColor: "#e2e8f0",
+    paddingHorizontal: 7,
+    paddingVertical: 3,
+    borderRadius: 6,
+    marginLeft: 6,
+  },
+  distanceText: {
+    fontSize: 11,
+    fontWeight: "700",
+    color: "#334155",
+  },
+  actionsRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    marginTop: 2,
+  },
+  muteButton: {
+    flex: 1,
+    height: 48,
+    borderRadius: 12,
+    backgroundColor: "#f1f5f9",
+    borderWidth: 1,
+    borderColor: "#cbd5e1",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  muteButtonText: {
+    fontSize: 13,
+    fontWeight: "700",
+    color: "#475569",
+  },
+  acceptButton: {
+    flex: 1,
+    height: 48,
+    borderRadius: 12,
+    backgroundColor: "#16a34a",
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 8,
+    shadowColor: "#16a34a",
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.3,
+    shadowRadius: 6,
+    elevation: 5,
+  },
+  acceptButtonWithMute: {
+    flex: 2.8,
+  },
+  acceptButtonText: {
+    color: "#ffffff",
     fontSize: 16,
-    fontWeight: "600",
+    fontWeight: "700",
+  },
+  acceptButtonIcon: {
+    color: "#ffffff",
+    fontSize: 18,
+    fontWeight: "800",
   },
   loadingContainer: {
     alignItems: "center",
     justifyContent: "center",
-    paddingVertical: 40,
+    paddingVertical: 36,
   },
   loadingText: {
-    marginTop: 16,
-    fontSize: 15,
+    marginTop: 10,
+    fontSize: 13,
     color: "#64748b",
   },
 });

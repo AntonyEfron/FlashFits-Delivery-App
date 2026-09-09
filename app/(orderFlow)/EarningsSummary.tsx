@@ -18,38 +18,45 @@ interface EarningsSummaryProps {
  * Derives real earnings from the order object.
  */
 const EarningsSummary: React.FC<EarningsSummaryProps> = ({ onFinish, order }) => {
-  // Real earnings from the order's charges
-  const baseFare = order?.deliveryCharge || order?.deliveryAmount || 0;
-  const returnCharge = order?.returnCharge || 0;
+  // Real earnings from the order's charges: Delivery Charge + Return Charge + Tip
+  const returnCharge = order?.originalReturnCharge ?? order?.returnCharge ?? 0;
+  const deliveryTip = order?.finalBilling?.deliveryTip || order?.deliveryTip || order?.tip || 0;
+  const baseFare = order?.originalDeliveryCharge 
+    ?? order?.finalBilling?.deliveryCharge 
+    ?? order?.deliveryCharge 
+    ?? (order?.deliveryAmount ? Math.max(0, order.deliveryAmount - returnCharge - deliveryTip) : 0);
 
-  // Check return/keep status
-  const hasReturns = order?.items?.some((i: any) => i.tryStatus === 'returned');
-  const returnBonus = hasReturns ? returnCharge : 0;
-
-  // Tip from customer (if any)
-  const deliveryTip = order?.finalBilling?.deliveryTip || 0;
+  // Waiting time compensation (if customer took long during try-phase)
+  const waitingCharge = order?.waitingTimeCharge || 0;
 
   const breakdown = useMemo(() => {
     const rows: { label: string; amount: number; icon: string; color: string }[] = [];
 
     if (baseFare > 0) {
-      rows.push({ label: 'Delivery Fare', amount: baseFare, icon: '🚴', color: '#3b82f6' });
+      rows.push({ label: 'Delivery Charge', amount: baseFare, icon: '🚴', color: '#3b82f6' });
     }
-    if (returnBonus > 0) {
-      rows.push({ label: 'Return Trip Charge', amount: returnBonus, icon: '🔄', color: '#10b981' });
+    if (returnCharge > 0) {
+      rows.push({ label: 'Return Charge', amount: returnCharge, icon: '🔄', color: '#10b981' });
     }
     if (deliveryTip > 0) {
       rows.push({ label: 'Customer Tip', amount: deliveryTip, icon: '💝', color: '#f59e0b' });
     }
-    // If no real data is available, show a placeholder
+    if (waitingCharge > 0) {
+      rows.push({ label: 'Waiting Time Comp', amount: waitingCharge, icon: '⏳', color: '#8b5cf6' });
+    }
+    // If no real data is available, show delivery fare fallback
     if (rows.length === 0) {
-      rows.push({ label: 'Delivery Fare', amount: 0, icon: '🚴', color: '#3b82f6' });
+      rows.push({ label: 'Delivery Charge', amount: order?.deliveryAmount || 0, icon: '🚴', color: '#3b82f6' });
     }
     return rows;
-  }, [baseFare, returnBonus, deliveryTip]);
+  }, [baseFare, returnCharge, waitingCharge, deliveryTip, order?.deliveryAmount]);
 
 
   const totalEarnings = breakdown.reduce((sum, item) => sum + item.amount, 0);
+  const collectedViaQR = order?.deliveryFeeRecovery?.collectedByRider === true;
+  const qrCollectedAmount = collectedViaQR ? (order?.deliveryFeeRecovery?.amount || 0) : 0;
+  // FlashFits payout is total minus what the rider already collected directly
+  const flashFitsPayout = Math.max(0, totalEarnings - qrCollectedAmount);
 
   const allKept = order?.items?.every((i: any) => i.tryStatus === 'accepted' || i.tryStatus === 'not-triable');
   const keptCount = order?.items?.filter((i: any) => i.tryStatus === 'accepted' || i.tryStatus === 'not-triable').length ?? 0;
@@ -106,6 +113,25 @@ const EarningsSummary: React.FC<EarningsSummaryProps> = ({ onFinish, order }) =>
             <Text style={styles.totalRowLabel}>Total</Text>
             <Text style={styles.totalRowAmount}>₹{totalEarnings}</Text>
           </View>
+          
+          {collectedViaQR && (
+            <View style={[styles.breakdownItem, { marginTop: 12, backgroundColor: '#f0fdf4', padding: 8, borderRadius: 8 }]}>
+              <View style={styles.itemLeft}>
+                <View style={[styles.iconContainer, { backgroundColor: '#10b98120' }]}>
+                  <Text style={styles.iconText}>📱</Text>
+                </View>
+                <Text style={[styles.itemLabel, { color: '#047857' }]}>Collected via QR</Text>
+              </View>
+              <Text style={[styles.itemAmount, { color: '#047857' }]}>-₹{qrCollectedAmount}</Text>
+            </View>
+          )}
+          
+          {collectedViaQR && (
+            <View style={[styles.totalRow, { marginTop: 8 }]}>
+              <Text style={[styles.totalRowLabel, { fontSize: 14 }]}>Weekly Payout Addition</Text>
+              <Text style={[styles.totalRowAmount, { fontSize: 16 }]}>₹{flashFitsPayout}</Text>
+            </View>
+          )}
         </View>
 
         {/* Order reference */}

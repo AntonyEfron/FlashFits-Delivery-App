@@ -20,7 +20,7 @@ import {
   Clock,
   Info,
 } from 'lucide-react-native';
-import { getCurrentWeekEarnings, getEarningsHistory, getRiderIncentives, getRiderWallet } from '../api/earnings';
+import { getCurrentWeekEarnings, getEarningsHistory, getRiderIncentives } from '../api/earnings';
 
 const DAY_NAMES = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
 
@@ -40,24 +40,20 @@ const EarningScreen = () => {
 
   // Data states
   const [currentWeek, setCurrentWeek] = useState(null);
-  const [walletBalance, setWalletBalance] = useState(0);
+
   const [history, setHistory] = useState([]);
   const [incentives, setIncentives] = useState([]);
 
   const fetchData = useCallback(async () => {
     try {
-      const [weekRes, walletRes, historyRes, incentiveRes] = await Promise.allSettled([
+      const [weekRes, historyRes, incentiveRes] = await Promise.allSettled([
         getCurrentWeekEarnings(),
-        getRiderWallet(),
         getEarningsHistory(1, 10),
         getRiderIncentives(),
       ]);
 
       if (weekRes.status === 'fulfilled' && weekRes.value.success) {
         setCurrentWeek(weekRes.value);
-      }
-      if (walletRes.status === 'fulfilled' && walletRes.value.success) {
-        setWalletBalance(walletRes.value.balance || 0);
       }
       if (historyRes.status === 'fulfilled' && historyRes.value.success) {
         setHistory(historyRes.value.payouts || []);
@@ -108,10 +104,10 @@ const EarningScreen = () => {
 
       {/* ── Summary Cards ── */}
       <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 12 }}>
-        <View style={{ flex: 1, backgroundColor: '#10b981', borderRadius: 16, padding: 16, marginRight: 8 }}>
+        <View style={{ flex: 1, backgroundColor: '#10b981', borderRadius: 16, padding: 16 }}>
           <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 8 }}>
             <DollarSign color="white" size={18} />
-            <Text style={{ color: 'white', marginLeft: 6, fontWeight: '500' }}>This Week</Text>
+            <Text style={{ color: 'white', marginLeft: 6, fontWeight: '500' }}>This Week's Pending</Text>
           </View>
           <Text style={{ color: 'white', fontSize: 28, fontWeight: 'bold' }}>
             ₹{(payout.netPayout || 0).toFixed(0)}
@@ -119,17 +115,6 @@ const EarningScreen = () => {
           <Text style={{ color: '#d1fae5', fontSize: 12 }}>
             {payout.completedOrders || 0} deliveries
           </Text>
-        </View>
-
-        <View style={{ flex: 1, backgroundColor: '#3b82f6', borderRadius: 16, padding: 16, marginLeft: 8 }}>
-          <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 8 }}>
-            <Package color="white" size={18} />
-            <Text style={{ color: 'white', marginLeft: 6, fontWeight: '500' }}>Wallet</Text>
-          </View>
-          <Text style={{ color: 'white', fontSize: 28, fontWeight: 'bold' }}>
-            ₹{walletBalance.toFixed(0)}
-          </Text>
-          <Text style={{ color: '#dbeafe', fontSize: 12 }}>Available balance</Text>
         </View>
       </View>
 
@@ -375,6 +360,17 @@ const EarningScreen = () => {
                       • {week.completedOrders || 0} orders
                     </Text>
                   </View>
+                  {(week.status === 'paid' || week.status === 'finalized') && (week.totalDeductions && week.totalDeductions > 0) ? (
+                    <View style={{ marginTop: 6, gap: 2 }}>
+                      <Text style={{ fontSize: 11, color: '#64748b' }}>Gross Earned: ₹{(week.totalEarnings || 0).toFixed(0)}</Text>
+                      <Text style={{ fontSize: 11, color: '#ef4444' }}>Deductions: -₹{week.totalDeductions.toFixed(0)}</Text>
+                      {week.adminDeduction && week.adminDeduction.amount > 0 && (
+                        <Text style={{ fontSize: 11, color: '#ef4444', fontWeight: '500' }}>
+                          Penalty: -₹{week.adminDeduction.amount.toFixed(0)} ({week.adminDeduction.reason})
+                        </Text>
+                      )}
+                    </View>
+                  ) : null}
                 </View>
                 {expandedWeek === week._id ? (
                   <ChevronUp color="#94a3b8" size={20} style={{ marginLeft: 8 }} />

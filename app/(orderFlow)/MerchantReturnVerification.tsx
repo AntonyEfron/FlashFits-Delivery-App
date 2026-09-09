@@ -9,11 +9,14 @@ import {
   TextInput,
   Alert,
   Image,
+  Platform,
+  KeyboardAvoidingView,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { ReachedReturnMerchantApi, ReturnVerificationApi } from '../api/orderFlow';
 import * as Location from 'expo-location';
+import { forceStopAlert } from '../../utils/alertManager';
 // import { joinOrderRoom, listenOrderUpdates, removeOrderListeners } from '@/app/sockets/order.socket';
 
 /**
@@ -25,10 +28,17 @@ import * as Location from 'expo-location';
  * 3. Rider enters merchant-provided return OTP to confirm handover
  */
 export default function MerchantReturnVerification({ onNext, order }) {
-  const [step, setStep] = useState('confirm_arrival'); // confirm_arrival | enter_otp | verifying | done
+  const isAlreadyAtMerchant = order?.deliveryRiderStatus === 'at_merchant_return';
+  const [step, setStep] = useState(isAlreadyAtMerchant ? 'enter_otp' : 'confirm_arrival'); // confirm_arrival | enter_otp | verifying | done
   const [otp, setOtp] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
+
+  useEffect(() => {
+    if (order?.deliveryRiderStatus === 'at_merchant_return') {
+      setStep('enter_otp');
+    }
+  }, [order?.deliveryRiderStatus]);
 
   const returnedItems = order?.items?.filter(i => i.tryStatus === 'returned') ?? [];
   const returnedCount = returnedItems.length;
@@ -44,9 +54,19 @@ export default function MerchantReturnVerification({ onNext, order }) {
       let longitude = null;
 
       if (status === 'granted') {
-        const loc = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.High });
-        latitude = loc.coords.latitude;
-        longitude = loc.coords.longitude;
+        const timeoutPromise = new Promise((resolve) => setTimeout(() => resolve(null), 4000));
+        const locationPromise = Location.getCurrentPositionAsync({
+          accuracy: Location.Accuracy.Balanced,
+        }).catch(() => null);
+
+        let loc: any = await Promise.race([locationPromise, timeoutPromise]);
+        if (!loc) {
+          loc = await Location.getLastKnownPositionAsync().catch(() => null);
+        }
+        if (loc?.coords) {
+          latitude = loc.coords.latitude;
+          longitude = loc.coords.longitude;
+        }
       }
 
       await ReachedReturnMerchantApi({ orderId, latitude, longitude });
@@ -73,6 +93,7 @@ export default function MerchantReturnVerification({ onNext, order }) {
       console.log(response);
       
       if (response && response.message === "Return OTP verified. Order complete.") {
+        forceStopAlert();
         setStep('done');
         // Small delay for UX, then proceed to earnings
         setTimeout(() => onNext(), 1200);
@@ -100,92 +121,97 @@ export default function MerchantReturnVerification({ onNext, order }) {
   }
 
   return (
-    <ScrollView contentContainerStyle={styles.container}>
-      {/* Header */}
-      <View style={styles.headerRow}>
-        <Ionicons name="storefront-outline" size={40} color="#1e3a8a" />
-        <Text style={styles.headerTitle}>Return Handover</Text>
-        <Text style={styles.headerSubtitle}>
-          Hand back the {returnedCount} returned item{returnedCount !== 1 ? 's' : ''} to the merchant.
-        </Text>
-      </View>
+    <KeyboardAvoidingView
+      style={{ flex: 1 }}
+      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+    >
+      <ScrollView contentContainerStyle={styles.container} keyboardShouldPersistTaps="handled">
+        {/* Header */}
+        <View style={styles.headerRow}>
+          <Ionicons name="storefront-outline" size={40} color="#1e3a8a" />
+          <Text style={styles.headerTitle}>Return Handover</Text>
+          <Text style={styles.headerSubtitle}>
+            Hand back the {returnedCount} returned item{returnedCount !== 1 ? 's' : ''} to the merchant.
+          </Text>
+        </View>
 
-      {/* Returned items summary */}
-      <View style={styles.card}>
-        <Text style={styles.cardTitle}>📦 Returning {returnedCount} item{returnedCount !== 1 ? 's' : ''}</Text>
-        {returnedItems.map((item, i) => (
-          <View key={i} style={styles.itemRow}>
-            {item.image ? (
-              <Image source={{ uri: item.image }} style={styles.itemThumb} />
-            ) : (
-              <View style={[styles.itemThumb, styles.itemThumbPlaceholder]}>
-                <Ionicons name="shirt-outline" size={20} color="#94a3b8" />
+        {/* Returned items summary */}
+        <View style={styles.card}>
+          <Text style={styles.cardTitle}>📦 Returning {returnedCount} item{returnedCount !== 1 ? 's' : ''}</Text>
+          {returnedItems.map((item, i) => (
+            <View key={i} style={styles.itemRow}>
+              {item.image ? (
+                <Image source={{ uri: item.image }} style={styles.itemThumb} />
+              ) : (
+                <View style={[styles.itemThumb, styles.itemThumbPlaceholder]}>
+                  <Ionicons name="shirt-outline" size={20} color="#94a3b8" />
+                </View>
+              )}
+              <View style={{ flex: 1 }}>
+                <Text style={styles.itemName} numberOfLines={1}>{item.name}</Text>
+                <Text style={styles.itemMeta}>Size: {item.size}  ·  ₹{item.price}</Text>
+                {item.returnReason ? (
+                  <Text style={styles.returnReason}>Reason: {item.returnReason}</Text>
+                ) : null}
               </View>
-            )}
-            <View style={{ flex: 1 }}>
-              <Text style={styles.itemName} numberOfLines={1}>{item.name}</Text>
-              <Text style={styles.itemMeta}>Size: {item.size}  ·  ₹{item.price}</Text>
-              {item.returnReason ? (
-                <Text style={styles.returnReason}>Reason: {item.returnReason}</Text>
-              ) : null}
             </View>
-          </View>
-        ))}
-      </View>
-
-      {/* Step 1: Confirm arrival */}
-      {step === 'confirm_arrival' && (
-        <View style={styles.actionSection}>
-          <Text style={styles.instructionText}>
-            Tap below once you've reached the merchant and are ready to hand over the items.
-          </Text>
-          {error && <Text style={styles.errorText}>{error}</Text>}
-          <TouchableOpacity
-            style={[styles.primaryButton, loading && styles.buttonDisabled]}
-            onPress={handleConfirmArrival}
-            disabled={loading}
-          >
-            {loading
-              ? <ActivityIndicator color="#fff" />
-              : <Text style={styles.primaryButtonText}>✅ Arrived at Merchant</Text>
-            }
-          </TouchableOpacity>
+          ))}
         </View>
-      )}
 
-      {/* Step 2: Enter return OTP */}
-      {step === 'enter_otp' && (
-        <View style={styles.actionSection}>
-          <Text style={styles.instructionText}>
-            Ask the merchant to verify the returned items and provide the return OTP.
-          </Text>
-          <View style={styles.otpBox}>
-            <Text style={styles.otpLabel}>Enter Return OTP</Text>
-            <TextInput
-              style={styles.otpInput}
-              value={otp}
-              onChangeText={setOtp}
-              placeholder="••••"
-              placeholderTextColor="#94a3b8"
-              keyboardType="number-pad"
-              maxLength={6}
-              autoFocus
-            />
+        {/* Step 1: Confirm arrival */}
+        {step === 'confirm_arrival' && (
+          <View style={styles.actionSection}>
+            <Text style={styles.instructionText}>
+              Tap below once you've reached the merchant and are ready to hand over the items.
+            </Text>
+            {error && <Text style={styles.errorText}>{error}</Text>}
+            <TouchableOpacity
+              style={[styles.primaryButton, loading && styles.buttonDisabled]}
+              onPress={handleConfirmArrival}
+              disabled={loading}
+            >
+              {loading
+                ? <ActivityIndicator color="#fff" />
+                : <Text style={styles.primaryButtonText}>✅ Arrived at Merchant</Text>
+              }
+            </TouchableOpacity>
           </View>
-          {error && <Text style={styles.errorText}>{error}</Text>}
-          <TouchableOpacity
-            style={[styles.primaryButton, loading && styles.buttonDisabled]}
-            onPress={handleVerifyOtp}
-            disabled={loading}
-          >
-            {loading
-              ? <ActivityIndicator color="#fff" />
-              : <Text style={styles.primaryButtonText}>Verify & Complete Return</Text>
-            }
-          </TouchableOpacity>
-        </View>
-      )}
-    </ScrollView>
+        )}
+
+        {/* Step 2: Enter return OTP */}
+        {step === 'enter_otp' && (
+          <View style={styles.actionSection}>
+            <Text style={styles.instructionText}>
+              Ask the merchant to verify the returned items and provide the return OTP.
+            </Text>
+            <View style={styles.otpBox}>
+              <Text style={styles.otpLabel}>Enter Return OTP</Text>
+              <TextInput
+                style={styles.otpInput}
+                value={otp}
+                onChangeText={(text) => setOtp(text.replace(/[^0-9]/g, ''))}
+                placeholder="0000"
+                placeholderTextColor="#94a3b8"
+                keyboardType="numeric"
+                maxLength={4}
+                selectTextOnFocus
+              />
+            </View>
+            {error && <Text style={styles.errorText}>{error}</Text>}
+            <TouchableOpacity
+              style={[styles.primaryButton, loading && styles.buttonDisabled]}
+              onPress={handleVerifyOtp}
+              disabled={loading}
+            >
+              {loading
+                ? <ActivityIndicator color="#fff" />
+                : <Text style={styles.primaryButtonText}>Verify & Complete Return</Text>
+              }
+            </TouchableOpacity>
+          </View>
+        )}
+      </ScrollView>
+    </KeyboardAvoidingView>
   );
 }
 
@@ -312,15 +338,17 @@ const styles = StyleSheet.create({
     letterSpacing: 0.5,
   },
   otpInput: {
-    fontSize: 36,
+    fontSize: 28,
     fontWeight: '700',
     color: '#1e3a8a',
-    letterSpacing: 16,
+    letterSpacing: Platform.OS === 'ios' ? 8 : 4,
     textAlign: 'center',
     borderBottomWidth: 2,
     borderBottomColor: '#1e3a8a',
-    paddingBottom: 6,
+    paddingVertical: 8,
     minWidth: 160,
+    backgroundColor: '#f8fafc',
+    borderRadius: 8,
   },
   primaryButton: {
     backgroundColor: '#1e3a8a',

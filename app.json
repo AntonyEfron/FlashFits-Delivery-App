@@ -32,19 +32,26 @@
       },
       "edgeToEdgeEnabled": true,
       "package": "com.flashfits.delivery",
+      "usesCleartextTraffic": true,
       "permissions": [
         "ACCESS_COARSE_LOCATION",
         "ACCESS_FINE_LOCATION",
         "ACCESS_BACKGROUND_LOCATION",
         "FOREGROUND_SERVICE",
-        "FOREGROUND_SERVICE_LOCATION"
+        "FOREGROUND_SERVICE_LOCATION",
+        "POST_NOTIFICATIONS",
+        "SYSTEM_ALERT_WINDOW",
+        "REQUEST_IGNORE_BATTERY_OPTIMIZATIONS",
+        "WAKE_LOCK",
+        "VIBRATE"
       ]
     },
     "web": {
       "favicon": "./assets/favicon.png"
     },
     "extra": {
-      "BACKEND_URL": "http://192.168.29.230:5000",
+      // "BACKEND_URL": "http://192.168.29.230:5000",
+      "BACKEND_URL": "https://api.theflashfits.com",
       "eas": {
         "projectId": "e1c32e96-5683-4f7d-acb3-58a1b3fa69b1"
       }

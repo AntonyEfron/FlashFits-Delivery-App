@@ -56,10 +56,10 @@ export const HandoverPackageApi = async ({ orderId, otp }) => {
   }
 };
 
-// Rider signals the timer has ended — customer selection takes over
-export const EndTrialPhaseApi = async ({ orderId }) => {
+// Rider enters customer OTP to end the timer and calculate amount
+export const EndTrialPhaseApi = async ({ orderId, otp }) => {
   try {
-    const response = await axiosInstance.post("/deliveryRider/order/endTrialPhase", { orderId });
+    const response = await axiosInstance.post("/deliveryRider/order/endTrialPhase", { orderId, otp });
     return response.data;
   } catch (error) {
     console.error("❌ EndTrialPhaseApi:", error.response?.data || error.message);
@@ -111,6 +111,67 @@ export const GetActiveOrderApi = async () => {
     return response.data;
   } catch (error) {
     console.error("❌ GetActiveOrderApi:", error.response?.data || error.message);
+    throw error;
+  }
+};
+
+export const ConfirmQrCollectionApi = async ({ orderId }) => {
+  try {
+    const response = await axiosInstance.post(`/deliveryRider/orders/${orderId}/confirm-qr-collection`);
+    return response.data;
+  } catch (error) {
+    console.error("❌ ConfirmQrCollectionApi:", error.response?.data || error.message);
+    throw error;
+  }
+};
+
+export const ReportDeliveryFeeRefusalApi = async ({ orderId }) => {
+  try {
+    const response = await axiosInstance.post(`/deliveryRider/orders/${orderId}/report-delivery-fee-refusal`);
+    return response.data;
+  } catch (error) {
+    console.error("❌ ReportDeliveryFeeRefusalApi:", error.response?.data || error.message);
+    throw error;
+  }
+};
+
+export const ConfirmCashCollectionApi = async ({ orderId }) => {
+  try {
+    const cleanId = String(orderId).replace(/^["']|["']$/g, '').trim();
+    const response = await axiosInstance.post(`/deliveryRider/orders/${cleanId}/confirm-cash-collection`, { orderId: cleanId });
+    return response.data;
+  } catch (error) {
+    console.error("❌ ConfirmCashCollectionApi:", error.response?.data || error.message);
+    throw error;
+  }
+};
+
+export const UploadReturnPhotosApi = async ({ orderId, photoUris }) => {
+  try {
+    const cleanId = String(orderId).replace(/^["']|["']$/g, '').trim();
+    const formData = new FormData();
+    formData.append("orderId", cleanId);
+
+    const uris = Array.isArray(photoUris) ? photoUris : [photoUris].filter(Boolean);
+    uris.forEach((uri, index) => {
+      const filename = uri.split('/').pop() || `return_photo_${index}.jpg`;
+      const match = /\.(\w+)$/.exec(filename);
+      const type = match ? `image/${match[1]}` : 'image/jpeg';
+      formData.append("photos", {
+        uri,
+        name: filename,
+        type,
+      });
+    });
+
+    const response = await axiosInstance.post("/deliveryRider/order/return-photos", formData, {
+      headers: {
+        "Content-Type": "multipart/form-data",
+      },
+    });
+    return response.data;
+  } catch (error) {
+    console.error("❌ UploadReturnPhotosApi:", error.response?.data || error.message);
     throw error;
   }
 };
