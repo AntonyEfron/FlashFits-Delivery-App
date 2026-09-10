@@ -192,8 +192,10 @@ export default function MerchantReturnVerification({ onNext, order }) {
                 onChangeText={(text) => setOtp(text.replace(/[^0-9]/g, ''))}
                 placeholder="0000"
                 placeholderTextColor="#94a3b8"
-                keyboardType="numeric"
+                keyboardType="number-pad"
                 maxLength={4}
+                textContentType="oneTimeCode"
+                autoComplete="sms-otp"
                 selectTextOnFocus
               />
             </View>

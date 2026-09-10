@@ -31,9 +31,15 @@ const ReachPickup: React.FC<ReachPickupProps> = ({ onNext }) => {
   }, []);
 
   /** 🧭 Dynamic pickup coordinates */
+  const rawCoords =
+    orderData?.pickupLocation?.coordinates ||
+    orderData?.pickupLocationCorrdinates?.coordinates ||
+    orderData?.merchantId?.address?.location?.coordinates ||
+    orderData?.warehouseId?.address?.location?.coordinates;
+
   const pickupCoords = { 
-    lat: orderData?.pickupLocation?.coordinates?.[1] || 9.9675883, 
-    lng: orderData?.pickupLocation?.coordinates?.[0] || 76.2994220 
+    lat: rawCoords?.[1] || orderData?.merchantId?.address?.latitude || 9.9675883, 
+    lng: rawCoords?.[0] || orderData?.merchantId?.address?.longitude || 76.2994220 
   };
 
   /** 🌍 Distance calculator (Haversine formula) */

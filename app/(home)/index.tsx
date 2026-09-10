@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useRef } from "react";
 import { View, Text, StyleSheet, ScrollView, Alert, Linking, AppState } from "react-native";
 import { router } from "expo-router";
 import * as SecureStore from "expo-secure-store";
@@ -127,14 +127,22 @@ export default function HomeScreen() {
               const rCharge = o?.originalReturnCharge ?? o?.returnCharge ?? 0;
               const dTip = o?.finalBilling?.deliveryTip ?? o?.deliveryTip ?? o?.tip ?? 0;
               const totalEarnings = dCharge + rCharge + dTip;
+              const customerPhone = o?.customerPhone || o?.deliveryLocation?.phone || o?.userId?.phoneNumber || null;
+              const customerName = o?.customerName || o?.deliveryLocation?.name || o?.userId?.name || "Customer";
 
               const orderData = {
                 orderId: o?._id,
                 _id: o?._id,
                 orderStatus: o?.orderStatus,
                 deliveryRiderStatus: o?.deliveryRiderStatus,
+                pickupLocation: o?.pickupLocation,
                 pickupLocationCorrdinates: o?.pickupLocation,
-                pickupAddress: o?.address,
+                merchantId: o?.merchantId,
+                pickupAddress:
+                  o?.merchantId?.address?.street ||
+                  (typeof o?.merchantId?.address === "string" ? o?.merchantId?.address : null) ||
+                  o?.address ||
+                  "Store / Merchant",
                 deliveryAmount: totalEarnings > 0 ? totalEarnings : (o?.deliveryAmount || 0),
                 deliveryCharge: dCharge,
                 originalDeliveryCharge: o?.originalDeliveryCharge || dCharge,
@@ -147,7 +155,10 @@ export default function HomeScreen() {
                 items: o?.items,
                 deliveryDistance: o?.deliveryDistance,
                 customerLocation: o?.customerLocation,
-                cutomerAddress: o?.cutomerAddress,
+                cutomerAddress: o?.cutomerAddress || o?.deliveryLocation?.addressLine1 || "No address",
+                customerPhone,
+                customerName,
+                deliveryLocation: o?.deliveryLocation,
               };
               const startStep = resolveStartStep(o.deliveryRiderStatus || "", o.orderStatus || "");
               await SecureStore.setItemAsync("acceptOrder", JSON.stringify(orderData));
@@ -211,10 +222,16 @@ export default function HomeScreen() {
     };
   }, []);
 
+  const appState = useRef(AppState.currentState);
+
   // ✅ Re-verify readiness and reconnect socket when app comes to foreground
   useEffect(() => {
     const subscription = AppState.addEventListener("change", async (nextState) => {
-      if (nextState === "active") {
+      const isComingToForeground =
+        appState.current.match(/inactive|background/) && nextState === "active";
+      appState.current = nextState;
+
+      if (isComingToForeground) {
         const savedOnline = await SecureStore.getItemAsync("isOnline");
         if (savedOnline === "true") {
           const readiness = await checkDeviceReadiness();
@@ -337,14 +354,22 @@ export default function HomeScreen() {
       const rCharge = payload?.originalReturnCharge ?? payload?.returnCharge ?? 0;
       const dTip = payload?.finalBilling?.deliveryTip ?? payload?.deliveryTip ?? payload?.tip ?? 0;
       const totalEarnings = dCharge + rCharge + dTip;
+      const customerPhone = payload?.customerPhone || payload?.deliveryLocation?.phone || payload?.userId?.phoneNumber || null;
+      const customerName = payload?.customerName || payload?.deliveryLocation?.name || payload?.userId?.name || "Customer";
 
       const orderData = {
         orderId: payload?._id,
         _id: payload?._id,
         orderStatus: payload?.orderStatus,
         deliveryRiderStatus: payload?.deliveryRiderStatus,
+        pickupLocation: payload?.pickupLocation,
         pickupLocationCorrdinates: payload?.pickupLocation,
-        pickupAddress: payload?.address,
+        merchantId: payload?.merchantId,
+        pickupAddress:
+          payload?.merchantId?.address?.street ||
+          (typeof payload?.merchantId?.address === "string" ? payload?.merchantId?.address : null) ||
+          payload?.address ||
+          "Store / Merchant",
         deliveryAmount: totalEarnings > 0 ? totalEarnings : (payload?.deliveryAmount || 0),
         deliveryCharge: dCharge,
         originalDeliveryCharge: payload?.originalDeliveryCharge || dCharge,
@@ -357,7 +382,10 @@ export default function HomeScreen() {
         items: payload?.items,
         deliveryDistance: payload?.deliveryDistance,
         customerLocation: payload?.customerLocation,
-        cutomerAddress: payload?.cutomerAddress,
+        cutomerAddress: payload?.cutomerAddress || payload?.deliveryLocation?.addressLine1 || "No address",
+        customerPhone,
+        customerName,
+        deliveryLocation: payload?.deliveryLocation,
       };
 
       // Resolve start step using centralized logic

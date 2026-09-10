@@ -9,10 +9,58 @@ import {
   Animated,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { Ionicons } from "@expo/vector-icons";
 import * as SecureStore from "expo-secure-store";
 import { AcceptOrderApi } from "../api/orderFlow";
 import { joinOrderRoom } from "../../config/socketConfig";
 import { stopOrderAlert } from "../../utils/alertManager";
+
+const formatAddress = (addr: any): string => {
+  if (!addr) return "";
+  if (typeof addr === "string") {
+    const trimmed = addr.trim();
+    return trimmed !== "null" && trimmed !== "undefined" ? trimmed : "";
+  }
+  if (typeof addr === "object") {
+    const parts = [
+      addr.addressLine1 || addr.street,
+      addr.addressLine2,
+      addr.landmark,
+      addr.area,
+      addr.city,
+      addr.pincode || addr.postalCode,
+    ].filter(Boolean);
+    return parts.join(", ");
+  }
+  return "";
+};
+
+const getPickupAddress = (orderObj: any): string => {
+  if (orderObj?.pickupAddress && typeof orderObj.pickupAddress === "string" && orderObj.pickupAddress !== "null") {
+    return orderObj.pickupAddress;
+  }
+  const mAddr = orderObj?.merchantId?.address || orderObj?.warehouseId?.address || orderObj?.merchantDetails?.address;
+  const formatted = formatAddress(mAddr);
+  if (formatted) return formatted;
+  if (orderObj?.pickupLocation?.address) return orderObj.pickupLocation.address;
+  return "Store pickup address available upon arrival";
+};
+
+const getCustomerAddress = (orderObj: any): string => {
+  const dAddr = orderObj?.deliveryLocation;
+  const formatted = formatAddress(dAddr);
+  if (formatted) return formatted;
+  if (orderObj?.customerAddress && typeof orderObj.customerAddress === "string" && orderObj.customerAddress !== "null") {
+    return orderObj.customerAddress;
+  }
+  if (orderObj?.cutomerAddress && typeof orderObj.cutomerAddress === "string" && orderObj.cutomerAddress !== "null") {
+    return orderObj.cutomerAddress;
+  }
+  if (orderObj?.address && typeof orderObj.address === "string" && orderObj.address !== "null") {
+    return orderObj.address;
+  }
+  return "Customer drop-off address available upon arrival";
+};
 
 interface AcceptOrderProps {
   onNext: () => void;
@@ -244,30 +292,81 @@ const AcceptOrder: React.FC<AcceptOrderProps> = ({ onNext, order: propOrder }) =
               </View>
             </View>
 
-            {/* Pickup Location Card */}
-            <View style={styles.pickupCard}>
-              <View style={styles.pickupIconBox}>
-                <Text style={styles.pickupIcon}>📍</Text>
-              </View>
+            {/* Route & Address Locations Card */}
+            {(() => {
+              const shopName =
+                order.shopName ||
+                order.merchantId?.shopName ||
+                order.warehouseDetails?.name ||
+                order.warehouseId?.name ||
+                "Store / Merchant";
+              const pickupAddress = getPickupAddress(order);
+              const customerName =
+                order.customerName ||
+                order.deliveryLocation?.name ||
+                order.userId?.name ||
+                "Customer";
+              const customerAddress = getCustomerAddress(order);
 
-              <View style={styles.pickupDetails}>
-                <Text style={styles.pickupLabel}>PICKUP FROM</Text>
-                <Text style={styles.shopName} numberOfLines={1}>
-                  {order.shopName || "Store / Merchant"}
-                </Text>
-                {order.pickupAddress && order.pickupAddress !== "null" ? (
-                  <Text style={styles.pickupAddress} numberOfLines={1}>
-                    {order.pickupAddress}
-                  </Text>
-                ) : null}
-              </View>
+              return (
+                <View style={styles.routeCard}>
+                  {/* Stop 1: Pickup Location */}
+                  <View style={styles.stopRow}>
+                    <View style={styles.stopIconCol}>
+                      <View style={[styles.stopIconBadge, { backgroundColor: "#DBEAFE" }]}>
+                        <Ionicons name="storefront" size={14} color="#1D4ED8" />
+                      </View>
+                      <View style={styles.stopConnectorLine} />
+                    </View>
 
-              {order.deliveryDistance ? (
-                <View style={styles.distanceBadge}>
-                  <Text style={styles.distanceText}>{order.deliveryDistance}</Text>
+                    <View style={styles.stopInfoCol}>
+                      <View style={styles.stopHeaderRow}>
+                        <Text style={styles.stopHeaderLabel}>PICKUP FROM</Text>
+                        {order.riderToShopKm ? (
+                          <View style={styles.distanceBadge}>
+                            <Text style={styles.distanceText}>{order.riderToShopKm} km to store</Text>
+                          </View>
+                        ) : null}
+                      </View>
+                      <Text style={styles.stopTitle} numberOfLines={1}>
+                        {shopName}
+                      </Text>
+                      <Text style={styles.stopAddressText} numberOfLines={2}>
+                        {pickupAddress}
+                      </Text>
+                    </View>
+                  </View>
+
+                  {/* Stop 2: Delivery Location */}
+                  <View style={[styles.stopRow, { marginTop: 4 }]}>
+                    <View style={styles.stopIconCol}>
+                      <View style={[styles.stopIconBadge, { backgroundColor: "#DCFCE7" }]}>
+                        <Ionicons name="location" size={14} color="#15803D" />
+                      </View>
+                    </View>
+
+                    <View style={styles.stopInfoCol}>
+                      <View style={styles.stopHeaderRow}>
+                        <Text style={[styles.stopHeaderLabel, { color: "#15803D" }]}>DELIVER TO</Text>
+                        {order.deliveryDistance ? (
+                          <View style={[styles.distanceBadge, { backgroundColor: "#DCFCE7" }]}>
+                            <Text style={[styles.distanceText, { color: "#15803D" }]}>
+                              {order.deliveryDistance} km delivery
+                            </Text>
+                          </View>
+                        ) : null}
+                      </View>
+                      <Text style={styles.stopTitle} numberOfLines={1}>
+                        {customerName}
+                      </Text>
+                      <Text style={styles.stopAddressText} numberOfLines={2}>
+                        {customerAddress}
+                      </Text>
+                    </View>
+                  </View>
                 </View>
-              ) : null}
-            </View>
+              );
+            })()}
 
             {/* Action Bar (1 Single Row - No Scrolling!) */}
             <View style={styles.actionsRow}>
@@ -449,61 +548,73 @@ const styles = StyleSheet.create({
   tipText: {
     color: "#b45309",
   },
-  pickupCard: {
-    flexDirection: "row",
-    alignItems: "center",
+  routeCard: {
     backgroundColor: "#f8fafc",
     borderRadius: 14,
-    paddingHorizontal: 12,
-    paddingVertical: 10,
+    padding: 12,
     borderWidth: 1,
     borderColor: "#e2e8f0",
     marginBottom: 10,
   },
-  pickupIconBox: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    backgroundColor: "#dbeafe",
+  stopRow: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+  },
+  stopIconCol: {
+    width: 26,
     alignItems: "center",
-    justifyContent: "center",
     marginRight: 10,
   },
-  pickupIcon: {
-    fontSize: 18,
-  },
-  pickupDetails: {
-    flex: 1,
+  stopIconBadge: {
+    width: 26,
+    height: 26,
+    borderRadius: 13,
+    alignItems: "center",
     justifyContent: "center",
   },
-  pickupLabel: {
-    fontSize: 9,
-    fontWeight: "700",
-    color: "#64748b",
-    letterSpacing: 0.6,
+  stopConnectorLine: {
+    width: 2,
+    height: 32,
+    backgroundColor: "#cbd5e1",
+    marginVertical: 2,
+  },
+  stopInfoCol: {
+    flex: 1,
+    paddingBottom: 2,
+  },
+  stopHeaderRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
     marginBottom: 1,
   },
-  shopName: {
-    fontSize: 15,
+  stopHeaderLabel: {
+    fontSize: 9,
+    fontWeight: "800",
+    color: "#64748b",
+    letterSpacing: 0.6,
+  },
+  stopTitle: {
+    fontSize: 14,
     fontWeight: "700",
     color: "#0f172a",
   },
-  pickupAddress: {
-    fontSize: 11,
-    color: "#64748b",
+  stopAddressText: {
+    fontSize: 12,
+    color: "#475569",
+    lineHeight: 16,
     marginTop: 1,
   },
   distanceBadge: {
-    backgroundColor: "#e2e8f0",
-    paddingHorizontal: 7,
-    paddingVertical: 3,
+    backgroundColor: "#eff6ff",
+    paddingHorizontal: 6,
+    paddingVertical: 2,
     borderRadius: 6,
-    marginLeft: 6,
   },
   distanceText: {
-    fontSize: 11,
+    fontSize: 10,
     fontWeight: "700",
-    color: "#334155",
+    color: "#2563eb",
   },
   actionsRow: {
     flexDirection: "row",

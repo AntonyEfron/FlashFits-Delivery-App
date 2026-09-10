@@ -13,6 +13,7 @@ import {
   Dimensions,
   Easing,
   Vibration,
+  Pressable,
 } from 'react-native';
 import { router } from "expo-router";
 import { LinearGradient } from 'expo-linear-gradient';
@@ -32,12 +33,13 @@ const OTPVerificationScreen: React.FC<OTPVerificationScreenProps> = ({
   phoneNumber,
   onBack
 }) => {
-  const [otp, setOtp] = useState<string[]>(['', '', '', '', '', '']);
+  const [otp, setOtp] = useState<string>('');
+  const [isInputFocused, setIsInputFocused] = useState(true);
   const [isLoading, setIsLoading] = useState(false);
   const [timer, setTimer] = useState(30);
   const [canResend, setCanResend] = useState(false);
 
-  const inputRefs = useRef<Array<TextInput | null>>([]);
+  const inputRef = useRef<TextInput | null>(null);
 
   // Animation values
   const fadeAnim = useRef(new Animated.Value(0)).current;
@@ -140,22 +142,20 @@ const OTPVerificationScreen: React.FC<OTPVerificationScreenProps> = ({
     }
   }, [isLoading]);
 
-  const handleOtpChange = (value: string, index: number) => {
-    if (isNaN(Number(value)) && value !== '') return;
-
-    const newOtp = [...otp];
-    newOtp[index] = value;
-    setOtp(newOtp);
+  const handleOtpChange = (value: string) => {
+    const cleaned = value.replace(/[^0-9]/g, '').slice(0, 6);
+    setOtp(cleaned);
 
     // Input fill animation
-    if (value !== '') {
-      Animated.spring(otpInputAnims[index], {
-        toValue: 1.1,
+    if (cleaned.length > 0) {
+      const idx = cleaned.length - 1;
+      Animated.spring(otpInputAnims[idx], {
+        toValue: 1.15,
         tension: 100,
         friction: 3,
         useNativeDriver: true,
       }).start(() => {
-        Animated.spring(otpInputAnims[index], {
+        Animated.spring(otpInputAnims[idx], {
           toValue: 1,
           tension: 100,
           friction: 7,
@@ -164,25 +164,9 @@ const OTPVerificationScreen: React.FC<OTPVerificationScreenProps> = ({
       });
     }
 
-    // Auto focus next input
-    if (value !== '' && index < 5) {
-      setTimeout(() => {
-        inputRefs.current[index + 1]?.focus();
-      }, 100);
-    }
-
-    // Auto verify when all digits are filled
-    if (newOtp.every(d => d !== '') && newOtp.join('').length === 6) {
-      setTimeout(() => verifyOTP(newOtp.join('')), 500);
-    }
-  };
-
-  const handleKeyPress = (key: string, index: number) => {
-    if (key === 'Backspace' && otp[index] === '' && index > 0) {
-      const newOtp = [...otp];
-      newOtp[index - 1] = '';
-      setOtp(newOtp);
-      inputRefs.current[index - 1]?.focus();
+    // Auto verify when all 6 digits are filled
+    if (cleaned.length === 6) {
+      setTimeout(() => verifyOTP(cleaned), 300);
     }
   };
 
@@ -243,8 +227,8 @@ const OTPVerificationScreen: React.FC<OTPVerificationScreenProps> = ({
         Animated.timing(shakeAnim, { toValue: 0, duration: 100, useNativeDriver: true }),
       ]).start();
 
-      setOtp(["", "", "", "", "", ""]);
-      setTimeout(() => inputRefs.current[0]?.focus(), 500);
+      setOtp('');
+      setTimeout(() => inputRef.current?.focus(), 500);
     } finally {
       setIsLoading(false);
     }
@@ -254,7 +238,7 @@ const OTPVerificationScreen: React.FC<OTPVerificationScreenProps> = ({
   const handleResendOTP = () => {
     setTimer(30);
     setCanResend(false);
-    setOtp(['', '', '', '', '', '']);
+    setOtp('');
 
     // Reset and animate inputs
     otpInputAnims.forEach((anim, index) => {
@@ -269,7 +253,7 @@ const OTPVerificationScreen: React.FC<OTPVerificationScreenProps> = ({
     });
 
     setTimeout(() => {
-      inputRefs.current[0]?.focus();
+      inputRef.current?.focus();
     }, 300);
 
     const interval = setInterval(() => {
@@ -362,49 +346,63 @@ const OTPVerificationScreen: React.FC<OTPVerificationScreenProps> = ({
 
           {/* OTP Input Section */}
           <View style={styles.otpSection}>
-            <View style={styles.otpContainer}>
-              {otp.map((digit, index) => (
-                <Animated.View
-                  key={index}
-                  style={[
-                    styles.otpInputWrapper,
-                    {
-                      transform: [
-                        { scale: otpInputAnims[index] },
-                      ],
-                    },
-                  ]}
-                >
-                  <LinearGradient
-                    colors={
-                      digit !== ''
-                        ? ['rgba(255, 107, 107, 0.2)', 'rgba(255, 142, 83, 0.2)']
-                        : ['rgba(255, 255, 255, 0.9)', 'rgba(255, 255, 255, 0.7)']
-                    }
+            <Pressable
+              style={styles.otpContainer}
+              onPress={() => inputRef.current?.focus()}
+            >
+              <TextInput
+                ref={inputRef}
+                style={styles.hiddenInput}
+                value={otp}
+                onChangeText={handleOtpChange}
+                keyboardType="number-pad"
+                maxLength={6}
+                autoFocus={true}
+                textContentType="oneTimeCode"
+                autoComplete="sms-otp"
+                onFocus={() => setIsInputFocused(true)}
+                onBlur={() => setIsInputFocused(false)}
+              />
+              {Array.from({ length: 6 }).map((_, index) => {
+                const digit = otp[index] || '';
+                const isCurrent = index === otp.length && isInputFocused;
+                return (
+                  <Animated.View
+                    key={index}
                     style={[
-                      styles.otpInputGradient,
-                      digit !== '' && styles.otpInputFilled,
+                      styles.otpInputWrapper,
+                      {
+                        transform: [
+                          { scale: otpInputAnims[index] },
+                        ],
+                      },
                     ]}
                   >
-                    <TextInput
-                      ref={ref => (inputRefs.current[index] = ref)}
+                    <LinearGradient
+                      colors={
+                        digit !== ''
+                          ? ['rgba(255, 107, 107, 0.2)', 'rgba(255, 142, 83, 0.2)']
+                          : isCurrent
+                          ? ['rgba(255, 255, 255, 1)', 'rgba(255, 255, 255, 0.85)']
+                          : ['rgba(255, 255, 255, 0.9)', 'rgba(255, 255, 255, 0.7)']
+                      }
                       style={[
-                        styles.otpInput,
-                        digit !== '' && styles.otpInputFilledText,
+                        styles.otpInputGradient,
+                        digit !== '' && styles.otpInputFilled,
+                        isCurrent && styles.otpInputCurrent,
                       ]}
-                      value={digit}
-                      onChangeText={value => handleOtpChange(value, index)}
-                      onKeyPress={({ nativeEvent }) => handleKeyPress(nativeEvent.key, index)}
-                      keyboardType="numeric"
-                      maxLength={1}
-                      textAlign="center"
-                      selectTextOnFocus
-                      selectionColor="#667eea"
-                    />
-                  </LinearGradient>
-                </Animated.View>
-              ))}
-            </View>
+                    >
+                      <View style={styles.otpDigitContainer}>
+                        <Text style={[styles.otpDigitText, digit !== '' && styles.otpInputFilledText]}>
+                          {digit}
+                        </Text>
+                        {isCurrent && <View style={styles.activeCursor} />}
+                      </View>
+                    </LinearGradient>
+                  </Animated.View>
+                );
+              })}
+            </Pressable>
 
             {/* Success Check Animation */}
             <Animated.View
@@ -608,6 +606,36 @@ const styles = StyleSheet.create({
     borderColor: '#FF6B6B',
     shadowColor: '#FF6B6B',
     shadowOpacity: 0.3,
+  },
+  hiddenInput: {
+    position: 'absolute',
+    width: '100%',
+    height: '100%',
+    opacity: 0,
+    zIndex: 10,
+  },
+  otpDigitContainer: {
+    height: 60,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  otpDigitText: {
+    fontSize: 24,
+    fontWeight: '700',
+    color: '#1F2937',
+    textAlign: 'center',
+  },
+  otpInputCurrent: {
+    borderColor: '#667eea',
+    borderWidth: 2.5,
+  },
+  activeCursor: {
+    position: 'absolute',
+    bottom: 12,
+    width: 16,
+    height: 2,
+    backgroundColor: '#667eea',
+    borderRadius: 1,
   },
   otpInput: {
     height: 60,

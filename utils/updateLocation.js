@@ -122,9 +122,22 @@ export const flushLocationQueue = async () => {
   }
 };
 
+let isStartingTracking = false;
+let isSendingImmediateLocation = false;
+let lastImmediateLocationTimestamp = 0;
+const IMMEDIATE_LOCATION_THROTTLE_MS = 10000; // 10 seconds throttle
+
 // ── Immediate Location Update (Single Shot) ──
 export const sendImmediateLocation = async (riderId) => {
   if (!riderId) return;
+
+  const now = Date.now();
+  if (now - lastImmediateLocationTimestamp < IMMEDIATE_LOCATION_THROTTLE_MS) {
+    return;
+  }
+  if (isSendingImmediateLocation) return;
+  isSendingImmediateLocation = true;
+
   try {
     const { status } = await Location.getForegroundPermissionsAsync();
     if (status !== "granted") return;
@@ -133,6 +146,7 @@ export const sendImmediateLocation = async (riderId) => {
       accuracy: Location.Accuracy.Balanced,
     });
     if (loc?.coords) {
+      lastImmediateLocationTimestamp = Date.now();
       const { latitude, longitude } = loc.coords;
       console.log("📍 Immediate location update sent:", latitude, longitude);
       sendRiderLocation(riderId, latitude, longitude);
@@ -146,37 +160,54 @@ export const sendImmediateLocation = async (riderId) => {
     }
   } catch (err) {
     console.warn("Could not send immediate location:", err.message);
+  } finally {
+    isSendingImmediateLocation = false;
   }
 };
 
 // ── 3. Start Location Tracking ──
 export const startLocationTracking = async (riderId) => {
   if (!riderId) return false;
-
-  // Immediately broadcast current location so rider is added to Redis Geo right away
-  sendImmediateLocation(riderId);
-
-  // Request permissions in sequence: Foreground then Background
-  const { status: foregroundStatus } = await Location.requestForegroundPermissionsAsync();
-  if (foregroundStatus !== "granted") {
-    console.warn("⚠️ Foreground location permission denied");
-    return false;
-  }
-
-  const { status: backgroundStatus } = await Location.requestBackgroundPermissionsAsync();
-  if (backgroundStatus !== "granted") {
-    console.warn("⚠️ Background location permission denied");
-    return false;
-  }
-
-  // Prevent duplicate background tasks
-  const hasStarted = await Location.hasStartedLocationUpdatesAsync(LOCATION_TASK_NAME);
-  if (hasStarted) {
-    console.log("📡 Background location tracking already running");
-    return true;
-  }
+  if (isStartingTracking) return false;
+  isStartingTracking = true;
 
   try {
+    // 1. Check if background tracking task is ALREADY running first
+    const hasStarted = await Location.hasStartedLocationUpdatesAsync(LOCATION_TASK_NAME);
+    if (hasStarted) {
+      return true;
+    }
+
+    // 2. Check permissions without requesting if already granted (prevents Android Activity lifecycle loops)
+    let { status: foregroundStatus } = await Location.getForegroundPermissionsAsync();
+    if (foregroundStatus !== "granted") {
+      const res = await Location.requestForegroundPermissionsAsync();
+      foregroundStatus = res.status;
+    }
+    if (foregroundStatus !== "granted") {
+      console.warn("⚠️ Foreground location permission denied");
+      return false;
+    }
+
+    let { status: backgroundStatus } = await Location.getBackgroundPermissionsAsync();
+    if (backgroundStatus !== "granted") {
+      const res = await Location.requestBackgroundPermissionsAsync();
+      backgroundStatus = res.status;
+    }
+    if (backgroundStatus !== "granted") {
+      console.warn("⚠️ Background location permission denied");
+      return false;
+    }
+
+    // Double check before launching task
+    const stillStarted = await Location.hasStartedLocationUpdatesAsync(LOCATION_TASK_NAME);
+    if (stillStarted) {
+      return true;
+    }
+
+    // Immediately broadcast current location once so rider is added to Redis Geo right away
+    sendImmediateLocation(riderId);
+
     await Location.startLocationUpdatesAsync(LOCATION_TASK_NAME, {
       accuracy: Location.Accuracy.Balanced,
       timeInterval: 10000, // every 10 seconds
@@ -193,6 +224,8 @@ export const startLocationTracking = async (riderId) => {
   } catch (error) {
     console.error("❌ Failed to start background location tracking:", error.message);
     return false;
+  } finally {
+    isStartingTracking = false;
   }
 };
 

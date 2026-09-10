@@ -23,6 +23,7 @@ import {
   EndTrialPhaseApi,
   ConfirmCashCollectionApi,
   UploadReturnPhotosApi,
+  GetActiveOrderApi,
 } from "../api/orderFlow";
 import { emitter } from "../../config/socketConfig";
 import { forceStopAlert } from "../../utils/alertManager";
@@ -131,8 +132,10 @@ const DeliveryDetails = ({
   const rCharge = orderData?.originalReturnCharge ?? orderData?.returnCharge ?? 0;
   const dTip = orderData?.finalBilling?.deliveryTip ?? orderData?.deliveryTip ?? orderData?.tip ?? 0;
   const baseEarnings = (dCharge + rCharge + dTip) || orderData?.deliveryAmount || 0;
-  // Calculate total earnings dynamically based on waited time
-  const deliveryEarnings = baseEarnings + (waitedMinutes * 2);
+  // Calculate total earnings dynamically based on waited time (waiting charge only after 10 min free trial)
+  const overtimeMinutes = Math.max(0, waitedMinutes - 10);
+  const waitingCharge = overtimeMinutes * 2;
+  const deliveryEarnings = baseEarnings + waitingCharge;
 
   // Load stored order and saved state
   useEffect(() => {
@@ -145,6 +148,41 @@ const DeliveryDetails = ({
         if (storedOrder) {
           const parsed = JSON.parse(storedOrder);
           setOrderData(parsed);
+
+          // If customer phone is missing from cached order, fetch live active order to obtain real phone
+          const existingPhone =
+            parsed?.customerPhone ||
+            parsed?.deliveryLocation?.phone ||
+            parsed?.userId?.phoneNumber;
+
+          if (!existingPhone) {
+            GetActiveOrderApi().then((res) => {
+              if (res?.success && res.order) {
+                const freshOrder = res.order;
+                const realPhone =
+                  freshOrder?.deliveryLocation?.phone ||
+                  freshOrder?.userId?.phoneNumber ||
+                  freshOrder?.customerPhone;
+                const realName =
+                  freshOrder?.deliveryLocation?.name ||
+                  freshOrder?.userId?.name ||
+                  freshOrder?.customerName;
+                if (realPhone) {
+                  setOrderData((prev: any) => {
+                    const updated = {
+                      ...prev,
+                      customerPhone: realPhone,
+                      customerName: realName || prev?.customerName || "Customer",
+                      deliveryLocation: freshOrder.deliveryLocation || prev?.deliveryLocation,
+                    };
+                    SecureStore.setItemAsync("acceptOrder", JSON.stringify(updated)).catch(() => {});
+                    return updated;
+                  });
+                }
+              }
+            }).catch(() => {});
+          }
+
           if (parsed.trialPhaseEnd) {
             setIsTrialEnded(true);
           }
@@ -446,8 +484,25 @@ const DeliveryDetails = ({
   };
 
   const handleCallCustomer = () => {
-    const phoneNumber = orderData?.customerPhone || "+911234567890";
-    Linking.openURL(`tel:${phoneNumber}`);
+    const rawPhone =
+      orderData?.customerPhone ||
+      orderData?.deliveryLocation?.phone ||
+      orderData?.userId?.phoneNumber ||
+      orderData?.deliveryLocation?.phoneNumber;
+
+    if (!rawPhone) {
+      Alert.alert(
+        "Phone Number Unavailable",
+        "Customer phone number is not available for this order."
+      );
+      return;
+    }
+
+    const cleaned = String(rawPhone).replace(/[^\d+]/g, "");
+    Linking.openURL(`tel:${cleaned}`).catch((err) => {
+      console.error("Failed to open phone dialer:", err);
+      Alert.alert("Error", "Could not open phone dialer on this device.");
+    });
   };
 
   const formatTime = (sec: number) => {
@@ -468,7 +523,11 @@ const DeliveryDetails = ({
   const orderId = orderData?.orderId
     ? `ORD-${orderData.orderId.slice(-4).toUpperCase()}`
     : "ORD-XXXX";
-  const customerName = orderData?.customerName || "Customer";
+  const customerName =
+    orderData?.customerName ||
+    orderData?.deliveryLocation?.name ||
+    orderData?.userId?.name ||
+    "Customer";
   const address =
     orderData?.cutomerAddress !== "null"
       ? orderData.cutomerAddress
@@ -551,8 +610,10 @@ const DeliveryDetails = ({
               style={styles.otpInput}
               placeholder="Enter 4-digit OTP"
               placeholderTextColor="#9ca3af"
-              keyboardType="numeric"
+              keyboardType="number-pad"
               maxLength={4}
+              textContentType="oneTimeCode"
+              autoComplete="sms-otp"
               value={handoverOtp}
               onChangeText={setHandoverOtp}
             />
@@ -600,7 +661,7 @@ const DeliveryDetails = ({
     const unpaidDeliveryCharge = (orderData?.originalDeliveryCharge ?? orderData?.deliveryCharge ?? 0);
     const unpaidReturnCharge = (orderData?.originalReturnCharge ?? orderData?.returnCharge ?? 0);
     const unpaidDeliveryTip = (orderData?.finalBilling?.deliveryTip ?? orderData?.deliveryTip ?? orderData?.tip ?? 0);
-    const overtimeCharge = (orderData?.finalBilling?.overtimePenalty ?? orderData?.overtimePenalty ?? 0);
+    const overtimeCharge = (orderData?.finalBilling?.overtimePenalty ?? orderData?.overtimePenalty ?? (waitedMinutes > 10 ? (waitedMinutes - 10) * 2 : 0));
     const calculatedDue = unpaidDeliveryCharge + unpaidReturnCharge + unpaidDeliveryTip + overtimeCharge;
     const directRiderDue = (orderData?.deliveryFeeRecovery?.amount && orderData.deliveryFeeRecovery.amount > 0)
       ? orderData.deliveryFeeRecovery.amount
@@ -610,7 +671,7 @@ const DeliveryDetails = ({
     const flashfitsOnlinePayable = orderData?.finalBilling?.totalPayable ?? orderData?.totalPayable ?? 0;
     const isPaidOnline = !isCustomerBuyingNothing && (orderData?.paymentStatus === 'paid');
     const hasReturns = items.some((i: any) => i.tryStatus === 'returned') || returnedCount > 0;
-    const requiresPhoto = hasReturns;
+    const requiresPhoto = true; // All Try & Buy orders require photo verification before customer can proceed to payment
     
     return (
       <ScrollView
@@ -638,9 +699,20 @@ const DeliveryDetails = ({
               <View style={[styles.progressBar, { width: `${progress}%` }]} />
             </View>
             <Text style={styles.timerSubtext}>
-              Waited: {waitedMinutes} mins
+              Waited: {waitedMinutes} mins {waitedMinutes <= 10 ? '(10 min free trial)' : ''}
             </Text>
-            <Text style={styles.timerSubtext}>
+            {waitedMinutes > 10 ? (
+              <View style={{ backgroundColor: 'rgba(239, 68, 68, 0.25)', paddingHorizontal: 10, paddingVertical: 4, borderRadius: 8, marginTop: 4, borderWidth: 1, borderColor: '#fca5a5' }}>
+                <Text style={{ fontSize: 13, fontWeight: '800', color: '#fff', textAlign: 'center' }}>
+                  ⏳ Waiting Charge: +₹{waitingCharge} ({overtimeMinutes}m overtime @ ₹2/min)
+                </Text>
+              </View>
+            ) : (
+              <Text style={[styles.timerSubtext, { opacity: 0.85, fontSize: 11 }]}>
+                Waiting Charge: ₹0 (free within 10-min trial)
+              </Text>
+            )}
+            <Text style={[styles.timerSubtext, { fontWeight: '700', marginTop: 4 }]}>
               Your earnings: ₹{deliveryEarnings}
             </Text>
           </View>
@@ -661,8 +733,10 @@ const DeliveryDetails = ({
                 style={styles.otpInput}
                 placeholder="Enter 4-digit OTP"
                 placeholderTextColor="#9ca3af"
-                keyboardType="numeric"
+                keyboardType="number-pad"
                 maxLength={4}
+                textContentType="oneTimeCode"
+                autoComplete="sms-otp"
                 value={trialOtp}
                 onChangeText={setTrialOtp}
               />

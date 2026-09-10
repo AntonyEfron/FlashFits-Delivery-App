@@ -129,7 +129,7 @@ export const connectRiderSocket = (riderId) => {
       currentOrderId = null;
       pendingOrderPayload = null;
       forceStopAlert();
-      await SecureStore.deleteItemAsync("currentOrderId").catch(() => {});
+      await SecureStore.deleteItemAsync("currentOrderId").catch(() => { });
       return;
     }
 
@@ -215,6 +215,10 @@ export const connectRiderSocket = (riderId) => {
         const mergedOrder = { ...storedOrder, ...order };
         // Preserve fields that backend doesn't send
         if (!order.shopName && storedOrder.shopName) mergedOrder.shopName = storedOrder.shopName;
+        if (!order.pickupLocation && storedOrder.pickupLocation) mergedOrder.pickupLocation = storedOrder.pickupLocation;
+        if (!order.pickupLocationCorrdinates && storedOrder.pickupLocationCorrdinates) mergedOrder.pickupLocationCorrdinates = storedOrder.pickupLocationCorrdinates;
+        if (!order.merchantId && storedOrder.merchantId) mergedOrder.merchantId = storedOrder.merchantId;
+        if (!order.pickupAddress && storedOrder.pickupAddress) mergedOrder.pickupAddress = storedOrder.pickupAddress;
         if (!order.cutomerAddress && storedOrder.cutomerAddress) mergedOrder.cutomerAddress = storedOrder.cutomerAddress;
         if (!order.customerLocation && storedOrder.customerLocation) mergedOrder.customerLocation = storedOrder.customerLocation;
         if (!order.deliveryAmount && storedOrder.deliveryAmount) mergedOrder.deliveryAmount = storedOrder.deliveryAmount;

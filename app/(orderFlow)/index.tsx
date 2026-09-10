@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useMemo, useCallback } from "react";
+import React, { useEffect, useState, useMemo, useCallback, useRef } from "react";
 import { AppState } from "react-native";
 import { useRouter, useLocalSearchParams } from "expo-router";
 import * as SecureStore from "expo-secure-store";
@@ -109,6 +109,13 @@ const OrderFlow: React.FC = () => {
     if (route === "earnings") {
       persistAndSetStep(9);
     } else {
+      SecureStore.getItemAsync("acceptOrder").then((stored) => {
+        if (stored) {
+          try {
+            setOrder(JSON.parse(stored));
+          } catch {}
+        }
+      }).catch(() => {});
       persistAndSetStep(7);
     }
   }, [persistAndSetStep]);
@@ -194,23 +201,27 @@ const OrderFlow: React.FC = () => {
     if (riderId) {
       connectRiderSocket(riderId);
       startLocationTracking(riderId);
-      sendImmediateLocation(riderId);
     }
   }, []);
+
+  const appState = useRef(AppState.currentState);
 
   // Monitor AppState (foreground/background changes) during order flow
   useEffect(() => {
     verifyReadinessForActiveOrder();
 
     const subscription = AppState.addEventListener("change", async (nextState) => {
-      if (nextState === "active") {
+      const isComingToForeground =
+        appState.current.match(/inactive|background/) && nextState === "active";
+      appState.current = nextState;
+
+      if (isComingToForeground) {
         const passed = await verifyReadinessForActiveOrder();
         if (passed) {
           const riderId = await SecureStore.getItemAsync("deliveryRiderId");
           if (riderId) {
             connectRiderSocket(riderId);
             startLocationTracking(riderId);
-            sendImmediateLocation(riderId);
           }
         }
       }
@@ -258,14 +269,22 @@ const OrderFlow: React.FC = () => {
       const rCharge = payload?.originalReturnCharge ?? payload?.returnCharge ?? 0;
       const dTip = payload?.finalBilling?.deliveryTip ?? payload?.deliveryTip ?? payload?.tip ?? 0;
       const totalEarnings = dCharge + rCharge + dTip;
+      const customerPhone = payload?.customerPhone || payload?.deliveryLocation?.phone || payload?.userId?.phoneNumber || null;
+      const customerName = payload?.customerName || payload?.deliveryLocation?.name || payload?.userId?.name || "Customer";
 
       const orderData = {
         orderId: payload?._id,
         _id: payload?._id,
         orderStatus: payload?.orderStatus,
         deliveryRiderStatus: payload?.deliveryRiderStatus,
+        pickupLocation: payload?.pickupLocation,
         pickupLocationCorrdinates: payload?.pickupLocation,
-        pickupAddress: payload?.address,
+        merchantId: payload?.merchantId,
+        pickupAddress:
+          payload?.merchantId?.address?.street ||
+          (typeof payload?.merchantId?.address === "string" ? payload?.merchantId?.address : null) ||
+          payload?.pickupAddress ||
+          "Store / Merchant",
         deliveryAmount: totalEarnings > 0 ? totalEarnings : (payload?.deliveryAmount || 0),
         deliveryCharge: dCharge,
         originalDeliveryCharge: payload?.originalDeliveryCharge || dCharge,
@@ -274,11 +293,14 @@ const OrderFlow: React.FC = () => {
         tip: dTip,
         deliveryTip: dTip,
         finalBilling: payload?.finalBilling,
-        shopName: payload?.merchantId?.shopName || "Unknown Shop",
+        shopName: payload?.merchantId?.shopName || payload?.warehouseDetails?.name || payload?.shopName || "Unknown Shop",
         items: payload?.items,
         deliveryDistance: payload?.deliveryDistance,
         customerLocation: payload?.customerLocation,
-        cutomerAddress: payload?.cutomerAddress,
+        cutomerAddress: payload?.cutomerAddress || payload?.deliveryLocation?.addressLine1 || "No address",
+        customerPhone,
+        customerName,
+        deliveryLocation: payload?.deliveryLocation,
       };
       setOrder(orderData);
       setCurrentStep(0);
@@ -321,8 +343,15 @@ const OrderFlow: React.FC = () => {
         merged.orderId = merged._id;
         // Preserve fields the backend doesn't include in updates
         if (!payload.shopName && prevOrder?.shopName) merged.shopName = prevOrder.shopName;
+        if (!payload.pickupLocation && prevOrder?.pickupLocation) merged.pickupLocation = prevOrder.pickupLocation;
+        if (!payload.pickupLocationCorrdinates && prevOrder?.pickupLocationCorrdinates) merged.pickupLocationCorrdinates = prevOrder.pickupLocationCorrdinates;
+        if (!payload.merchantId && prevOrder?.merchantId) merged.merchantId = prevOrder.merchantId;
+        if (!payload.pickupAddress && prevOrder?.pickupAddress) merged.pickupAddress = prevOrder.pickupAddress;
         if (!payload.cutomerAddress && prevOrder?.cutomerAddress) merged.cutomerAddress = prevOrder.cutomerAddress;
         if (!payload.customerLocation && prevOrder?.customerLocation) merged.customerLocation = prevOrder.customerLocation;
+        if (!payload.customerPhone && prevOrder?.customerPhone) merged.customerPhone = prevOrder.customerPhone;
+        if (!payload.customerName && prevOrder?.customerName) merged.customerName = prevOrder.customerName;
+        if (!payload.deliveryLocation && prevOrder?.deliveryLocation) merged.deliveryLocation = prevOrder.deliveryLocation;
         if (!payload.deliveryAmount && prevOrder?.deliveryAmount) merged.deliveryAmount = prevOrder.deliveryAmount;
         if (!payload.deliveryCharge && prevOrder?.deliveryCharge) merged.deliveryCharge = prevOrder.deliveryCharge;
         if (!payload.returnCharge && prevOrder?.returnCharge) merged.returnCharge = prevOrder.returnCharge;

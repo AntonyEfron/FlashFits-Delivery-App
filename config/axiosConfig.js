@@ -48,15 +48,15 @@ api.interceptors.response.use(
   (response) => response,
   async (error) => {
     const originalRequest = error.config;
-    
+
     // Do not trigger token refresh for public / auth endpoints
-    const isPublicEndpoint = originalRequest.url?.includes('auth/verify-otp') || 
-                             originalRequest.url?.includes('auth/refresh') ||
-                             originalRequest.url?.includes('/register');
+    const isPublicEndpoint = originalRequest.url?.includes('auth/verify-otp') ||
+      originalRequest.url?.includes('auth/refresh') ||
+      originalRequest.url?.includes('/register');
 
     if (error.response?.status === 401 && !originalRequest._retry && !isPublicEndpoint) {
       if (isRefreshing) {
-        return new Promise(function(resolve, reject) {
+        return new Promise(function (resolve, reject) {
           failedQueue.push({ resolve, reject });
         }).then(token => {
           if (originalRequest.headers && typeof originalRequest.headers.set === 'function') {
@@ -77,17 +77,17 @@ api.interceptors.response.use(
 
         const baseURL = `${BACKEND_URL}/api/`;
         const res = await axios.post(`${baseURL}deliveryRider/auth/refresh`, { refreshToken });
-        
+
         const token = res.data?.token || res.data?.data?.token;
         const newRefreshToken = res.data?.refreshToken || res.data?.data?.refreshToken;
 
         if (token) {
           await SecureStore.setItemAsync('token', token);
           if (newRefreshToken) await SecureStore.setItemAsync('refreshToken', newRefreshToken);
-          
+
           processQueue(null, token);
           isRefreshing = false;
-          
+
           if (originalRequest.headers && typeof originalRequest.headers.set === 'function') {
             originalRequest.headers.set('Authorization', `Bearer ${token}`);
           } else {
